@@ -1,5 +1,5 @@
-import { rewriteContent } from '../../../lib/gemini';
-import { getTemplatePromptAddition } from '../../../lib/templates';
+import { rewriteContent } from '../../../../lib/gemini';
+import { getTemplatePromptAddition } from '../../../../lib/templates';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {

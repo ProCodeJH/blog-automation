@@ -80,8 +80,15 @@ export async function POST(request) {
 // DELETE - 게시물 삭제
 export async function DELETE(request) {
     try {
-        const { searchParams } = new URL(request.url);
-        const id = searchParams.get('id');
+        // Support both body { id } and query param ?id=xxx
+        let id = null;
+        try {
+            const body = await request.json();
+            id = body.id;
+        } catch {
+            const { searchParams } = new URL(request.url);
+            id = searchParams.get('id');
+        }
 
         if (!id) {
             return NextResponse.json(

@@ -1,4 +1,4 @@
-import { analyzeKeywords } from '../../../lib/keywords';
+import { analyzeKeywords } from '../../../../lib/keywords';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
