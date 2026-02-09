@@ -1,145 +1,202 @@
 'use client';
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 
 export default function PostsPage() {
     const [posts, setPosts] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedPosts, setSelectedPosts] = useState(new Set());
+    const [sortBy, setSortBy] = useState('newest');
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchPosts();
     }, []);
 
     const fetchPosts = async () => {
-        try {
-            const res = await fetch('/api/posts');
-            const data = await res.json();
-            if (data.success) setPosts(data.posts);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
+        const res = await fetch('/api/posts');
+        const data = await res.json();
+        if (data.success) setPosts(data.posts);
+    };
+
+    const handleDelete = async (id) => {
+        if (!confirm('정말 삭제하시겠습니까?')) return;
+        const res = await fetch('/api/posts', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id }),
+        });
+        const data = await res.json();
+        if (data.success) setPosts((prev) => prev.filter((p) => p.id !== id));
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedPosts.size === 0) return;
+        if (!confirm(`${selectedPosts.size}개의 게시물을 삭제하시겠습니까?`)) return;
+        setIsDeleting(true);
+        for (const id of selectedPosts) {
+            await fetch('/api/posts', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id }),
+            });
+        }
+        setSelectedPosts(new Set());
+        await fetchPosts();
+        setIsDeleting(false);
+    };
+
+    const handleBulkStatusChange = async (newStatus) => {
+        if (selectedPosts.size === 0) return;
+        for (const id of selectedPosts) {
+            const post = posts.find(p => p.id === id);
+            if (post) {
+                await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...post, status: newStatus }),
+                });
+            }
+        }
+        setSelectedPosts(new Set());
+        await fetchPosts();
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedPosts.size === filteredPosts.length) {
+            setSelectedPosts(new Set());
+        } else {
+            setSelectedPosts(new Set(filteredPosts.map(p => p.id)));
         }
     };
 
-    const deletePost = async (id) => {
-        if (!confirm('이 게시물을 삭제하시겠습니까?')) return;
-        try {
-            await fetch(`/api/posts?id=${id}`, { method: 'DELETE' });
-            setPosts((prev) => prev.filter((p) => p.id !== id));
-        } catch (err) {
-            console.error(err);
-        }
+    const toggleSelect = (id) => {
+        setSelectedPosts(prev => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
     };
 
-    const filteredPosts = filter === 'all' ? posts : posts.filter((p) => p.status === filter);
-
-    const getStatusBadge = (status) => {
-        const map = {
-            draft: { class: 'badge-draft', label: '초안' },
-            ready: { class: 'badge-ready', label: '편집완료' },
-            published: { class: 'badge-published', label: '발행됨' },
-            scheduled: { class: 'badge-scheduled', label: '예약' },
-        };
-        const badge = map[status] || map.draft;
-        return <span className={`post-status-badge ${badge.class}`}>{badge.label}</span>;
+    const copyToClipboard = async (post) => {
+        const text = `<h1>${post.title}</h1>\n${post.content}\n\n${(post.tags || []).map(t => `#${t}`).join(' ')}`;
+        await navigator.clipboard.writeText(text);
+        alert('HTML 복사 완료! 블로그에 붙여넣기 하세요');
     };
 
-    const formatDate = (dateStr) => {
-        if (!dateStr) return '';
-        const d = new Date(dateStr);
-        return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    };
+    const filteredPosts = posts
+        .filter((p) => filter === 'all' || p.status === filter)
+        .filter((p) => !searchQuery || p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || p.rawText?.toLowerCase().includes(searchQuery.toLowerCase()))
+        .sort((a, b) => {
+            if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
+            if (sortBy === 'oldest') return new Date(a.createdAt) - new Date(b.createdAt);
+            if (sortBy === 'seo') return (b.seoScore || 0) - (a.seoScore || 0);
+            if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
+            return 0;
+        });
+
+    const getSeoClass = (score) => score >= 80 ? 'seo-good' : score >= 50 ? 'seo-ok' : 'seo-bad';
 
     return (
         <div>
             <div className="page-header">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                        <h2>📋 게시물 관리</h2>
-                        <p>작성한 게시물을 관리하고 발행하세요</p>
-                    </div>
-                    <Link href="/editor" className="btn btn-primary" style={{ textDecoration: 'none' }}>
-                        ✏️ 새 글 작성
-                    </Link>
-                </div>
+                <h2>📋 게시물 관리</h2>
+                <p>{posts.length}개 게시물 · {posts.filter(p => p.status === 'published').length}개 발행됨</p>
             </div>
 
-            {/* Filter */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-                {[
-                    { key: 'all', label: '전체' },
-                    { key: 'draft', label: '초안' },
-                    { key: 'ready', label: '편집완료' },
-                    { key: 'published', label: '발행됨' },
-                ].map((f) => (
-                    <button
-                        key={f.key}
-                        className={`tone-chip ${filter === f.key ? 'active' : ''}`}
-                        onClick={() => setFilter(f.key)}
-                    >
-                        {f.label} ({f.key === 'all' ? posts.length : posts.filter((p) => p.status === f.key).length})
-                    </button>
-                ))}
-            </div>
+            {/* Toolbar */}
+            <div className="card" style={{ marginBottom: 16, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input type="text" className="form-input" placeholder="🔍 검색..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: 200, fontSize: 13 }} />
 
-            {/* Posts List */}
-            {loading ? (
-                <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
-                    <div className="spinner" style={{ margin: '0 auto 12px' }}></div>
-                    로딩 중...
-                </div>
-            ) : filteredPosts.length === 0 ? (
-                <div className="card" style={{ padding: 60, textAlign: 'center' }}>
-                    <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.3 }}>📝</div>
-                    <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>
-                        {filter === 'all' ? '아직 작성한 글이 없습니다' : `${filter} 상태의 글이 없습니다`}
-                    </p>
-                    <Link href="/editor" className="btn btn-primary" style={{ textDecoration: 'none', display: 'inline-flex' }}>
-                        첫 글 작성하기
-                    </Link>
-                </div>
-            ) : (
-                <div className="posts-list">
-                    {filteredPosts.map((post) => (
-                        <div key={post.id} className="post-card">
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {post.title}
-                                </div>
-                                <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-                                    <span>📅 {formatDate(post.createdAt)}</span>
-                                    <span>🖼️ {post.images?.length || 0}장</span>
-                                    <span>📊 SEO {post.seoScore || 0}점</span>
-                                    {post.tone && <span>🎨 {post.tone}</span>}
-                                </div>
-                                {post.tags && post.tags.length > 0 && (
-                                    <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
-                                        {post.tags.slice(0, 5).map((tag) => (
-                                            <span key={tag} className="tag" style={{ fontSize: 10 }}>#{tag}</span>
-                                        ))}
-                                        {post.tags.length > 5 && (
-                                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>+{post.tags.length - 5}</span>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-                                {getStatusBadge(post.status)}
-                                <button
-                                    className="btn btn-ghost btn-sm"
-                                    onClick={() => deletePost(post.id)}
-                                    style={{ color: 'var(--error)', fontSize: 18 }}
-                                    title="삭제"
-                                >
-                                    🗑️
-                                </button>
-                            </div>
-                        </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                    {['all', 'draft', 'ready', 'scheduled', 'published'].map((f) => (
+                        <button key={f} className={`tone-chip ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
+                            {f === 'all' ? '전체' : f}
+                        </button>
                     ))}
                 </div>
-            )}
+
+                <select className="form-input" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ width: 'auto', fontSize: 13 }}>
+                    <option value="newest">최신순</option>
+                    <option value="oldest">오래된순</option>
+                    <option value="seo">SEO순</option>
+                    <option value="title">제목순</option>
+                </select>
+
+                {/* Bulk Actions */}
+                {selectedPosts.size > 0 && (
+                    <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', alignItems: 'center' }}>
+                        <span style={{ fontSize: 12, color: 'var(--accent-primary)', fontWeight: 600 }}>{selectedPosts.size}개 선택</span>
+                        <button className="btn btn-ghost btn-sm" onClick={() => handleBulkStatusChange('ready')}>준비 완료</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => handleBulkStatusChange('published')}>발행</button>
+                        <button className="btn btn-sm" style={{ background: 'var(--error)', color: '#fff' }} onClick={handleBulkDelete} disabled={isDeleting}>
+                            {isDeleting ? '삭제 중...' : '🗑️ 삭제'}
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* Posts Table */}
+            <div className="card" style={{ padding: 0 }}>
+                {filteredPosts.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: 48, marginBottom: 12 }}>📝</div>
+                        <p>게시물이 없습니다</p>
+                        <a href="/editor" className="btn btn-primary" style={{ marginTop: 12, display: 'inline-block', textDecoration: 'none' }}>✏️ 글 작성하기</a>
+                    </div>
+                ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                                <th style={{ padding: '12px 16px', textAlign: 'left', width: 40 }}>
+                                    <input type="checkbox" checked={selectedPosts.size === filteredPosts.length && filteredPosts.length > 0} onChange={toggleSelectAll} />
+                                </th>
+                                <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>제목</th>
+                                <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, width: 70 }}>상태</th>
+                                <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, width: 50 }}>SEO</th>
+                                <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, width: 40 }}>📷</th>
+                                <th style={{ padding: '12px 8px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, width: 90 }}>날짜</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, width: 100 }}>액션</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredPosts.map((post) => (
+                                <tr key={post.id} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.15s' }} onMouseOver={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
+                                    <td style={{ padding: '10px 16px' }}>
+                                        <input type="checkbox" checked={selectedPosts.has(post.id)} onChange={() => toggleSelect(post.id)} />
+                                    </td>
+                                    <td style={{ padding: '10px 8px' }}>
+                                        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{post.title || '무제'}</div>
+                                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                            {post.tone && <span>{post.tone} · </span>}
+                                            {post.category && <span>{post.category} · </span>}
+                                            {(post.tags || []).slice(0, 3).map(t => `#${t}`).join(' ')}
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                        <span className={`status-badge status-${post.status}`}>{post.status}</span>
+                                    </td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                        {post.seoScore > 0 && <span className={`seo-badge ${getSeoClass(post.seoScore)}`}>{post.seoScore}</span>}
+                                    </td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>
+                                        {post.images?.length || 0}
+                                    </td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
+                                        {new Date(post.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                                    </td>
+                                    <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                            {post.content && <button className="btn btn-ghost btn-sm" onClick={() => copyToClipboard(post)} title="HTML 복사">📋</button>}
+                                            <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(post.id)} title="삭제">🗑️</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
         </div>
     );
 }
