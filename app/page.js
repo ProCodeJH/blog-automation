@@ -25,22 +25,32 @@ export default function Dashboard() {
     totalImages: posts.reduce((sum, p) => sum + (p.images?.length || 0), 0),
   };
 
-  const recentPosts = [...posts].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+  // Weekly mini chart data
+  const now = new Date();
+  const weekData = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - (6 - i));
+    const dateStr = d.toISOString().slice(0, 10);
+    return posts.filter(p => p.createdAt?.startsWith(dateStr)).length;
+  });
+  const maxWeek = Math.max(1, ...weekData);
+
+  const recentPosts = [...posts].sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt)).slice(0, 5);
 
   const quickActions = [
     { icon: '✏️', label: '새 글 작성', href: '/editor', desc: 'AI 파워블로거 에디터', color: 'var(--accent-primary)' },
     { icon: '📋', label: '게시물 관리', href: '/posts', desc: `${stats.total}개 저장됨`, color: 'var(--info)' },
-    { icon: '📅', label: '캘린더', href: '/calendar', desc: '발행 스케줄 관리', color: 'var(--accent-secondary)' },
-    { icon: '📊', label: '분석', href: '/analytics', desc: 'SEO & 통계', color: 'var(--success)' },
-    { icon: '🔍', label: '키워드 리서치', href: '/editor', desc: '에디터에서 사용', color: 'hsl(45,100%,50%)' },
-    { icon: '⚙️', label: '설정', href: '/settings', desc: 'API & 플랫폼', color: 'var(--text-muted)' },
+    { icon: '🎬', label: '유튜브 업로드', href: '/youtube', desc: 'AI 메타 자동 생성', color: '#ff0000' },
+    { icon: '📊', label: '분석', href: '/analytics', desc: 'SEO & 차트', color: 'var(--success)' },
+    { icon: '📅', label: '캘린더', href: '/calendar', desc: '발행 스케줄', color: 'var(--accent-secondary)' },
+    { icon: '⚙️', label: '설정', href: '/settings', desc: '4 플랫폼 연동', color: 'var(--text-muted)' },
   ];
 
   return (
     <div>
       <div className="page-header">
         <h2>🏠 대시보드</h2>
-        <p>BlogFlow v2.0 · AI 파워블로거 편집 시스템</p>
+        <p>BlogFlow v3.0 · AI 파워블로거 콘텐츠 시스템</p>
       </div>
 
       {/* Stats */}
@@ -80,40 +90,64 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Recent Posts */}
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700 }}>📄 최근 게시물</h3>
-            <Link href="/posts" style={{ fontSize: 12, color: 'var(--accent-secondary)', textDecoration: 'none' }}>전체 보기 →</Link>
-          </div>
-
-          {!loaded ? (
-            <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>로딩 중...</div>
-          ) : recentPosts.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>📝</div>
-              <p>아직 게시물이 없습니다</p>
-              <Link href="/editor" className="btn btn-primary" style={{ marginTop: 12, display: 'inline-block', textDecoration: 'none' }}>✏️ 첫 글 작성하기</Link>
-            </div>
-          ) : (
-            <div className="posts-list">
-              {recentPosts.map((p) => (
-                <div key={p.id} className="post-card">
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{p.title || '무제'}</div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span className={`status-badge status-${p.status}`}>{p.status}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        {new Date(p.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                      </span>
-                      {p.seoScore > 0 && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>SEO {p.seoScore}</span>}
-                    </div>
-                  </div>
-                  {p.images?.length > 0 && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>📷{p.images.length}</span>}
+        {/* Right: Weekly + Recent */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Weekly Trend Mini Chart */}
+          <div className="card">
+            <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📈 주간 활동</h3>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 50 }}>
+              {weekData.map((count, i) => (
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <div style={{
+                    width: '100%',
+                    maxWidth: 28,
+                    height: `${Math.max(3, (count / maxWeek) * 40)}px`,
+                    background: count > 0 ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                    borderRadius: 3,
+                    transition: 'height 0.3s ease',
+                  }} />
+                  <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>
+                    {['일', '월', '화', '수', '목', '금', '토'][(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6 + i)).getDay()]}
+                  </span>
                 </div>
               ))}
             </div>
-          )}
+          </div>
+
+          {/* Recent Posts */}
+          <div className="card" style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700 }}>📄 최근 게시물</h3>
+              <Link href="/posts" style={{ fontSize: 12, color: 'var(--accent-secondary)', textDecoration: 'none' }}>전체 보기 →</Link>
+            </div>
+
+            {!loaded ? (
+              <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>로딩 중...</div>
+            ) : recentPosts.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>📝</div>
+                <p>아직 게시물이 없습니다</p>
+                <Link href="/editor" className="btn btn-primary" style={{ marginTop: 8, display: 'inline-block', textDecoration: 'none', fontSize: 12 }}>✏️ 첫 글 작성</Link>
+              </div>
+            ) : (
+              <div className="posts-list" style={{ maxHeight: 200, overflow: 'auto' }}>
+                {recentPosts.map((p) => (
+                  <div key={p.id} className="post-card" style={{ padding: '10px 12px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 3 }}>{p.title || '무제'}</div>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span className={`status-badge status-${p.status}`} style={{ fontSize: 10 }}>{p.status}</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                          {new Date(p.updatedAt || p.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                        </span>
+                        {p.seoScore > 0 && <span style={{ fontSize: 10, color: p.seoScore >= 80 ? 'var(--success)' : 'var(--text-muted)' }}>SEO {p.seoScore}</span>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
