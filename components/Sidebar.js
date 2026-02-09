@@ -13,6 +13,7 @@ export default function Sidebar() {
         { href: '/posts', icon: '📋', label: '게시물 관리' },
         { href: '/calendar', icon: '📅', label: '캘린더' },
         { href: '/analytics', icon: '📊', label: '분석' },
+        { href: '/youtube', icon: '🎬', label: '유튜브' },
         { href: '/settings', icon: '⚙️', label: '설정' },
     ];
 
