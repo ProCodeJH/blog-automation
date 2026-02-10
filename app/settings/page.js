@@ -21,6 +21,12 @@ export default function SettingsPage() {
     const [ytAccessToken, setYtAccessToken] = useState('');
     const [ytRefreshToken, setYtRefreshToken] = useState('');
 
+    // Naver
+    const [naverCookies, setNaverCookies] = useState('');
+    const [naverBlogId, setNaverBlogId] = useState('');
+    const [naverTestResult, setNaverTestResult] = useState(null);
+    const [naverTesting, setNaverTesting] = useState(false);
+
     const [masterPromptOverride, setMasterPromptOverride] = useState('');
     const [showPromptEditor, setShowPromptEditor] = useState(false);
     const [saveMsg, setSaveMsg] = useState('');
@@ -40,6 +46,8 @@ export default function SettingsPage() {
             setYtClientSecret(s.ytClientSecret || '');
             setYtAccessToken(s.ytAccessToken || '');
             setYtRefreshToken(s.ytRefreshToken || '');
+            setNaverCookies(s.naverCookies || '');
+            setNaverBlogId(s.naverBlogId || '');
             setMasterPromptOverride(s.masterPromptOverride || '');
         }
         const t = localStorage.getItem('blogflow_theme') || 'dark';
@@ -52,6 +60,7 @@ export default function SettingsPage() {
             geminiKey, gaId, wpUrl, wpUser, wpPass,
             tsToken, tsBlogName,
             ytClientId, ytClientSecret, ytAccessToken, ytRefreshToken,
+            naverCookies, naverBlogId,
             masterPromptOverride,
         }));
         setSaveMsg('✅ 설정 저장 완료!');
@@ -68,7 +77,7 @@ export default function SettingsPage() {
         { key: 'wordpress', icon: 'W', label: 'WordPress', desc: 'REST API', color: '#21759b', status: wpUrl ? 'connected' : 'disconnected' },
         { key: 'tistory', icon: 'T', label: '티스토리', desc: 'Open API', color: '#f36f21', status: tsToken ? 'connected' : 'disconnected' },
         { key: 'youtube', icon: '▶', label: 'YouTube', desc: 'Data API v3', color: '#ff0000', status: ytAccessToken ? 'connected' : 'disconnected' },
-        { key: 'naver', icon: 'N', label: '네이버 블로그', desc: 'HTML 생성 + 클립보드 복사', color: '#03c75a', status: 'connected' },
+        { key: 'naver', icon: 'N', label: '네이버 블로그', desc: naverCookies ? '쿠키 인증 (자동 발행)' : 'HTML 복사 모드', color: '#03c75a', status: naverCookies ? 'connected' : 'clipboard' },
     ];
 
     return (
@@ -193,6 +202,60 @@ export default function SettingsPage() {
                             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                                 <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style={{ color: '#ff0000' }}>Google Cloud Console</a> → YouTube Data API v3 활성화 → OAuth 2.0 클라이언트 생성
                             </span>
+                        </div>
+                    </div>
+
+                    {/* Naver Cookie Auth */}
+                    <div className="card settings-section">
+                        <h3 style={{ color: '#03c75a' }}>N 네이버 블로그 (자동 발행)</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            <div className="form-group">
+                                <label className="form-label">블로그 ID (선택)</label>
+                                <input type="text" className="form-input" placeholder="네이버 아이디 (자동 감지됨)" value={naverBlogId} onChange={(e) => setNaverBlogId(e.target.value)} />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">쿠키</label>
+                                <textarea className="form-input" style={{ minHeight: 80, fontFamily: 'monospace', fontSize: 11 }}
+                                    placeholder="NID_AUT=...; NID_SES=...; nid_inf=..."
+                                    value={naverCookies}
+                                    onChange={(e) => setNaverCookies(e.target.value)}
+                                />
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <button className="btn btn-sm" style={{ background: '#03c75a', color: '#fff', border: 'none' }} disabled={naverTesting || !naverCookies} onClick={async () => {
+                                    setNaverTesting(true);
+                                    setNaverTestResult(null);
+                                    try {
+                                        const res = await fetch('/api/naver/test-cookie', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ cookies: naverCookies }),
+                                        });
+                                        const data = await res.json();
+                                        setNaverTestResult(data);
+                                        if (data.blogId && !naverBlogId) setNaverBlogId(data.blogId);
+                                    } catch (e) {
+                                        setNaverTestResult({ success: false, message: e.message });
+                                    }
+                                    setNaverTesting(false);
+                                }}>
+                                    {naverTesting ? '⏳ 테스트 중...' : '🔍 쿠키 테스트'}
+                                </button>
+                                {naverTestResult && (
+                                    <span style={{ fontSize: 12, color: naverTestResult.success ? 'var(--success)' : 'var(--danger)' }}>
+                                        {naverTestResult.message}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, padding: 10, background: 'var(--bg-secondary)', borderRadius: 6 }}>
+                                <strong>📋 쿠키 추출 방법:</strong><br />
+                                1. Chrome에서 <a href="https://blog.naver.com" target="_blank" style={{ color: '#03c75a' }}>blog.naver.com</a>에 로그인<br />
+                                2. F12 → Application → Cookies → blog.naver.com<br />
+                                3. <code>NID_AUT</code>, <code>NID_SES</code> 값을 복사<br />
+                                4. 형식: <code>NID_AUT=값; NID_SES=값</code>
+                            </div>
                         </div>
                     </div>
 

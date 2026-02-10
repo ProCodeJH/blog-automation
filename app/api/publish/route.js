@@ -1,6 +1,6 @@
 import { publishToWordPress } from '../../../lib/platforms/wordpress';
 import { publishToTistory } from '../../../lib/platforms/tistory';
-import { generateNaverHTML, generateNaverSmartEditorHTML } from '../../../lib/platforms/naver';
+import { generateNaverHTML, generateNaverSmartEditorHTML, publishToNaver } from '../../../lib/platforms/naver';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
@@ -40,13 +40,27 @@ export async function POST(request) {
                 break;
 
             case 'naver': {
-                // 네이버는 API가 없으므로 최적화 HTML을 생성하여 반환
+                // 쿠키가 있으면 자동 발행 시도
+                if (credentials?.naverCookies) {
+                    result = await publishToNaver(post, credentials.naverCookies, credentials.naverBlogId);
+
+                    // 자동 발행 성공
+                    if (result.success) break;
+
+                    // 실패했지만 fallback 가능하면 HTML 모드로
+                    if (!result.fallbackToHTML) break;
+                }
+
+                // HTML 복사 모드 (쿠키 없거나 자동 발행 실패)
                 const naverHTML = generateNaverHTML(post);
                 const smartEditorHTML = generateNaverSmartEditorHTML(post);
                 result = {
                     success: true,
                     platform: 'naver',
-                    message: '네이버 블로그용 HTML이 생성되었습니다. 클립보드에 복사하여 붙여넣기하세요.',
+                    method: 'clipboard',
+                    message: credentials?.naverCookies
+                        ? '⚠️ 자동 발행 실패. HTML을 클립보드에 복사하여 붙여넣기하세요.'
+                        : '네이버 블로그용 HTML이 생성되었습니다. 클립보드에 복사하여 붙여넣기하세요.',
                     html: naverHTML.html,
                     smartEditorHTML: smartEditorHTML,
                     plainText: naverHTML.plainText,
