@@ -1,0 +1,94 @@
+﻿node.exe : ⚠ Warning:
+ Next.js inferred you
+r workspace root, but
+ it may not be correc
+t.
+위치 줄:1 문자:1
++ & "C:\Program Files
+\nodejs/node.exe" "C:
+\Program Files\nodejs
+/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (⚠ Warni   
+ ng: Next...not b    
+e correct.:Strin    g
+) [], RemoteExc    ep
+tion
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+ We detected multiple
+ lockfiles and select
+ed the directory of C
+:\Users\louis\.gemini
+\antigravity\scratch\
+package-lock.json as 
+the root directory.
+ To silence this warn
+ing, set `turbopack.r
+oot` in your Next.js 
+config, or consider r
+emoving one of the lo
+ckfiles if it's not n
+eeded.
+   See https://nextjs
+.org/docs/app/api-ref
+erence/config/next-co
+nfig-js/turbopack#roo
+t-directory for more 
+information.
+ Detected additional 
+lockfiles: 
+   * C:\Users\louis\.
+gemini\antigravity\sc
+ratch\blog-automation
+\package-lock.json
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 51s
+  Running TypeScript ...
+  Collecting page data using 5 workers ...
+  Generating static pages using 5 workers (0/24) ...
+  Generating static pages using 5 workers (6/24) 
+  Generating static pages using 5 workers (12/24) 
+  Generating static pages using 5 workers (18/24) 
+✓ Generating static pages using 5 workers (24/24) in 5.0s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /analytics
+├ ƒ /api/ai/keywords
+├ ƒ /api/ai/planner
+├ ƒ /api/ai/repurpose
+├ ƒ /api/ai/rewrite
+├ ƒ /api/ai/titles
+├ ƒ /api/import
+├ ƒ /api/posts
+├ ƒ /api/publish
+├ ƒ /api/rss
+├ ƒ /api/seo
+├ ƒ /api/upload
+├ ƒ /api/youtube/auth
+├ ƒ /api/youtube/upload
+├ ○ /calendar
+├ ○ /editor
+├ ○ /planner
+├ ○ /posts
+├ ○ /settings
+└ ○ /youtube
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

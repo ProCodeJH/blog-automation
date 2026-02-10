@@ -57,6 +57,19 @@ export default function EditorPage() {
     const [publishStatus, setPublishStatus] = useState({});
     const [isPublishing, setIsPublishing] = useState(false);
 
+    // v5: Platform Preview (⑨)
+    const [showPreview, setShowPreview] = useState(false);
+    const [previewPlatform, setPreviewPlatform] = useState('naver');
+
+    // v5: Repurpose (①)
+    const [showRepurpose, setShowRepurpose] = useState(false);
+    const [repurposeResult, setRepurposeResult] = useState(null);
+    const [isRepurposing, setIsRepurposing] = useState(false);
+
+    // v5: Version History (⑧)
+    const [showHistory, setShowHistory] = useState(false);
+    const [historyVersions, setHistoryVersions] = useState([]);
+
     const fileInputRef = useRef(null);
     const autoSaveTimer = useRef(null);
 
@@ -833,6 +846,114 @@ export default function EditorPage() {
                     </div>
                 </div>
             </div>
+
+            {/* ─── v5 Action Bar ─── */}
+            {aiResult && (
+                <div className="card" style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>v5 도구:</span>
+                    <button className="btn btn-ghost btn-sm" onClick={async () => {
+                        setIsRepurposing(true); setShowRepurpose(true);
+                        try {
+                            const res = await fetch('/api/ai/repurpose', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: aiResult.title, content: aiResult.content }) });
+                            const d = await res.json();
+                            if (d.success) setRepurposeResult(d.repurposed);
+                        } catch { }
+                        setIsRepurposing(false);
+                    }}>📱 SNS 리퍼포징</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setShowPreview(true)}>👁️ 플랫폼 미리보기</button>
+                    {postId && <button className="btn btn-ghost btn-sm" onClick={async () => {
+                        const res = await fetch(`/api/posts?history=${postId}`);
+                        const d = await res.json();
+                        if (d.success) { setHistoryVersions(d.versions || []); setShowHistory(true); }
+                    }}>📜 버전 히스토리</button>}
+                </div>
+            )}
+
+            {/* ⑨ Platform Preview Modal */}
+            {showPreview && aiResult && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPreview(false)}>
+                    <div className="card" style={{ width: '90%', maxWidth: 800, maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <h3 style={{ fontSize: 16, fontWeight: 700 }}>👁️ 플랫폼별 미리보기</h3>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setShowPreview(false)}>✕</button>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+                            {[{ k: 'naver', l: '네이버' }, { k: 'tistory', l: '티스토리' }, { k: 'velog', l: 'Velog' }, { k: 'wordpress', l: 'WordPress' }].map(p => (
+                                <button key={p.k} className={`tone-chip ${previewPlatform === p.k ? 'active' : ''}`} onClick={() => setPreviewPlatform(p.k)}>{p.l}</button>
+                            ))}
+                        </div>
+                        <div style={{
+                            background: previewPlatform === 'naver' ? '#fff' : previewPlatform === 'tistory' ? '#fff' : previewPlatform === 'velog' ? '#1e1e1e' : '#fff',
+                            color: previewPlatform === 'velog' ? '#d9d9d9' : '#333',
+                            padding: 24, borderRadius: 12, fontFamily: previewPlatform === 'naver' ? "'Noto Sans KR', sans-serif" : previewPlatform === 'velog' ? "'Fira Mono', monospace" : 'inherit',
+                            border: '1px solid #e5e5e5',
+                        }}>
+                            {previewPlatform === 'naver' && <div style={{ borderBottom: '3px solid #03c75a', paddingBottom: 8, marginBottom: 16, fontSize: 11, color: '#03c75a', fontWeight: 700 }}>네이버 블로그</div>}
+                            {previewPlatform === 'tistory' && <div style={{ borderBottom: '2px solid #FF5A00', paddingBottom: 8, marginBottom: 16, fontSize: 11, color: '#FF5A00', fontWeight: 700 }}>Tistory</div>}
+                            {previewPlatform === 'velog' && <div style={{ borderBottom: '2px solid #20c997', paddingBottom: 8, marginBottom: 16, fontSize: 11, color: '#20c997', fontWeight: 700 }}>velog</div>}
+                            {previewPlatform === 'wordpress' && <div style={{ borderBottom: '2px solid #0073aa', paddingBottom: 8, marginBottom: 16, fontSize: 11, color: '#0073aa', fontWeight: 700 }}>WordPress</div>}
+                            <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 12 }}>{aiResult.title}</h1>
+                            <div style={{ fontSize: 12, color: previewPlatform === 'velog' ? '#aaa' : '#999', marginBottom: 16 }}>{new Date().toLocaleDateString('ko-KR')} · 약 {Math.ceil((aiResult.content?.length || 0) / 500)}분 읽기</div>
+                            <div style={{ fontSize: 14, lineHeight: 1.8 }} dangerouslySetInnerHTML={{ __html: aiResult.content?.slice(0, 1500) }} />
+                            {aiResult.tags?.length > 0 && <div style={{ marginTop: 16, display: 'flex', gap: 4, flexWrap: 'wrap' }}>{aiResult.tags.map(t => <span key={t} style={{ padding: '2px 10px', background: previewPlatform === 'velog' ? '#2d2d2d' : '#f0f0f0', borderRadius: 12, fontSize: 11, color: previewPlatform === 'velog' ? '#20c997' : '#666' }}>#{t}</span>)}</div>}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ① Repurpose Modal */}
+            {showRepurpose && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowRepurpose(false)}>
+                    <div className="card" style={{ width: '90%', maxWidth: 700, maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <h3 style={{ fontSize: 16, fontWeight: 700 }}>📱 SNS 리퍼포징</h3>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setShowRepurpose(false)}>✕</button>
+                        </div>
+                        {isRepurposing ? (
+                            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}><div className="spinner" style={{ margin: '0 auto 16px' }} />AI가 각 플랫폼에 맞게 변환 중...</div>
+                        ) : repurposeResult ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                {Object.entries(repurposeResult).map(([platform, text]) => (
+                                    <div key={platform} style={{ padding: 14, background: 'var(--bg-tertiary)', borderRadius: 10 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                            <span style={{ fontSize: 13, fontWeight: 700 }}>{platform === 'instagram' ? '📷 인스타그램' : platform === 'twitter' ? '🐦 트위터/X' : platform === 'linkedin' ? '💼 링크드인' : platform === 'thread' ? '🧵 쓰레드' : '▶️ 유튜브 설명'}</span>
+                                            <button className="btn btn-ghost btn-sm" onClick={() => { navigator.clipboard.writeText(text); }}>📋 복사</button>
+                                        </div>
+                                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{text}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
+            )}
+
+            {/* ⑧ Version History Modal */}
+            {showHistory && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowHistory(false)}>
+                    <div className="card" style={{ width: '90%', maxWidth: 600, maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <h3 style={{ fontSize: 16, fontWeight: 700 }}>📜 버전 히스토리</h3>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setShowHistory(false)}>✕</button>
+                        </div>
+                        {historyVersions.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>이전 버전이 없습니다</div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {historyVersions.slice().reverse().map((v, i) => (
+                                    <div key={i} style={{ padding: 12, background: 'var(--bg-tertiary)', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div>
+                                            <div style={{ fontSize: 13, fontWeight: 600 }}>v{v.version} — {v.title}</div>
+                                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(v.savedAt).toLocaleString('ko-KR')}</div>
+                                        </div>
+                                        <button className="btn btn-ghost btn-sm" onClick={() => { setRawText(v.rawText || ''); setTitle(v.title || ''); setShowHistory(false); }}>복원</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

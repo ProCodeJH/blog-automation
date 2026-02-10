@@ -1,13 +1,18 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export default function PostsPage() {
     const [posts, setPosts] = useState([]);
     const [filter, setFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('');
+    const [toneFilter, setToneFilter] = useState('');
     const [selectedPosts, setSelectedPosts] = useState(new Set());
     const [sortBy, setSortBy] = useState('newest');
     const [isDeleting, setIsDeleting] = useState(false);
+    const [showImport, setShowImport] = useState(false);
+    const [importText, setImportText] = useState('');
+    const fileRef = useRef(null);
 
     useEffect(() => {
         fetchPosts();
@@ -84,9 +89,39 @@ export default function PostsPage() {
         alert('HTML 복사 완료! 블로그에 붙여넣기 하세요');
     };
 
+    // ⑦ Import handler
+    const handleImport = async (format) => {
+        try {
+            const res = await fetch('/api/import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data: importText, format }),
+            });
+            const data = await res.json();
+            if (data.success) { alert(`✅ ${data.imported}개 가져오기 완료`); setShowImport(false); setImportText(''); fetchPosts(); }
+            else alert('❌ ' + data.error);
+        } catch (e) { alert('❌ ' + e.message); }
+    };
+
+    // ⑩ Export
+    const handleExport = (format) => {
+        const data = format === 'csv'
+            ? 'title,rawText,tags,category,tone,status,seoScore\n' + posts.map(p => `"${p.title}","${(p.rawText || '').slice(0, 200)}","${(p.tags || []).join(';')}","${p.category || ''}","${p.tone || ''}","${p.status}","${p.seoScore || 0}"`).join('\n')
+            : JSON.stringify(posts, null, 2);
+        const blob = new Blob([data], { type: format === 'csv' ? 'text/csv' : 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `blogflow-posts.${format}`; a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const categories = [...new Set(posts.map(p => p.category).filter(Boolean))];
+    const tones = [...new Set(posts.map(p => p.tone).filter(Boolean))];
+
     const filteredPosts = posts
         .filter((p) => filter === 'all' || p.status === filter)
-        .filter((p) => !searchQuery || p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || p.rawText?.toLowerCase().includes(searchQuery.toLowerCase()))
+        .filter((p) => !categoryFilter || p.category === categoryFilter)
+        .filter((p) => !toneFilter || p.tone === toneFilter)
+        .filter((p) => !searchQuery || p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || p.rawText?.toLowerCase().includes(searchQuery.toLowerCase()) || (p.tags || []).some(t => t.toLowerCase().includes(searchQuery.toLowerCase())))
         .sort((a, b) => {
             if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
             if (sortBy === 'oldest') return new Date(a.createdAt) - new Date(b.createdAt);
@@ -106,7 +141,7 @@ export default function PostsPage() {
 
             {/* Toolbar */}
             <div className="card" style={{ marginBottom: 16, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                <input type="text" className="form-input" placeholder="🔍 검색..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: 200, fontSize: 13 }} />
+                <input type="text" className="form-input" placeholder="🔍 제목·내용·태그 검색..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: 220, fontSize: 13 }} />
 
                 <div style={{ display: 'flex', gap: 4 }}>
                     {['all', 'draft', 'ready', 'scheduled', 'published'].map((f) => (
@@ -116,6 +151,20 @@ export default function PostsPage() {
                     ))}
                 </div>
 
+                {categories.length > 0 && (
+                    <select className="form-input" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={{ width: 'auto', fontSize: 13 }}>
+                        <option value="">📂 카테고리</option>
+                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                )}
+
+                {tones.length > 0 && (
+                    <select className="form-input" value={toneFilter} onChange={(e) => setToneFilter(e.target.value)} style={{ width: 'auto', fontSize: 13 }}>
+                        <option value="">🎭 톤</option>
+                        {tones.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                )}
+
                 <select className="form-input" value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ width: 'auto', fontSize: 13 }}>
                     <option value="newest">최신순</option>
                     <option value="oldest">오래된순</option>
@@ -123,9 +172,14 @@ export default function PostsPage() {
                     <option value="title">제목순</option>
                 </select>
 
-                {/* Bulk Actions */}
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setShowImport(true)}>📥 가져오기</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => handleExport('json')}>📤 JSON</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => handleExport('csv')}>📤 CSV</button>
+                </div>
+
                 {selectedPosts.size > 0 && (
-                    <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: 6, width: '100%', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
                         <span style={{ fontSize: 12, color: 'var(--accent-primary)', fontWeight: 600 }}>{selectedPosts.size}개 선택</span>
                         <button className="btn btn-ghost btn-sm" onClick={() => handleBulkStatusChange('ready')}>준비 완료</button>
                         <button className="btn btn-ghost btn-sm" onClick={() => handleBulkStatusChange('published')}>발행</button>
@@ -135,6 +189,21 @@ export default function PostsPage() {
                     </div>
                 )}
             </div>
+
+            {/* ⑦ Import Modal */}
+            {showImport && (
+                <div className="card" style={{ marginBottom: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <h3 style={{ fontSize: 14, fontWeight: 700 }}>📥 벌크 가져오기</h3>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setShowImport(false)}>✕</button>
+                    </div>
+                    <textarea className="form-input" rows={6} placeholder={'JSON:\n[{"title":"제목","rawText":"내용","tags":["태그1"]}]\n\nCSV:\ntitle,rawText,tags,category,tone\n제목,내용,태그1;태그2,카테고리,friendly'} value={importText} onChange={e => setImportText(e.target.value)} style={{ fontSize: 12, fontFamily: 'monospace' }} />
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                        <button className="btn btn-primary btn-sm" onClick={() => handleImport('json')}>JSON 가져오기</button>
+                        <button className="btn btn-secondary btn-sm" onClick={() => handleImport('csv')}>CSV 가져오기</button>
+                    </div>
+                </div>
+            )}
 
             {/* Posts Table */}
             <div className="card" style={{ padding: 0 }}>

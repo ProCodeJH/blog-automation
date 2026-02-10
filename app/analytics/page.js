@@ -104,11 +104,48 @@ export default function AnalyticsPage() {
         </div>
     );
 
+    const exportAnalytics = (format) => {
+        const report = {
+            generated: new Date().toISOString(),
+            summary: { total, published, draft, scheduled, ready, avgSeo, totalImages },
+            weeklyTrend: weekData,
+            monthlyTrend: monthData,
+            statusDistribution: statusData,
+            seoDistribution: seoRanges,
+            categories,
+            tones,
+        };
+        if (format === 'json') {
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'blogflow-analytics.json'; a.click();
+            URL.revokeObjectURL(url);
+        } else {
+            const rows = [
+                'Metric,Value',
+                `Total Posts,${total}`, `Published,${published}`, `Draft,${draft}`, `Scheduled,${scheduled}`, `Ready,${ready}`,
+                `Avg SEO,${avgSeo}`, `Total Images,${totalImages}`,
+                '', 'Weekly Trend', ...weekData.map(d => `${d.label},${d.count}`),
+                '', 'Monthly Trend', ...monthData.map(d => `${d.label},${d.count}`),
+            ];
+            const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'blogflow-analytics.csv'; a.click();
+            URL.revokeObjectURL(url);
+        }
+    };
+
     return (
         <div>
-            <div className="page-header">
-                <h2>📊 분석</h2>
-                <p>BlogFlow 콘텐츠 분석 대시보드</p>
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                    <h2>📊 분석</h2>
+                    <p>BlogFlow 콘텐츠 분석 대시보드</p>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => exportAnalytics('json')}>📤 JSON</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => exportAnalytics('csv')}>📤 CSV</button>
+                </div>
             </div>
 
             {/* KPI */}

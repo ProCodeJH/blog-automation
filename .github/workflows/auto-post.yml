@@ -1,0 +1,55 @@
+name: 🤖 Auto Generate Blog Post
+
+on:
+  schedule:
+    # 매일 오전 9시 (한국 시간) = UTC 0시
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 수동 실행 가능
+
+jobs:
+  generate-post:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 🔧 Install dependencies
+        run: npm ci
+
+      - name: 🤖 Generate new blog post
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: node scripts/generate-post.js
+
+      - name: 📝 Check for changes
+        id: changes
+        run: |
+          git add data/ 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 💾 Commit and push
+        if: steps.changes.outputs.changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git commit -m "✨ Auto-generated blog post - $(date +'%Y-%m-%d')"
+          git push
+
+      - name: 🚀 Deploy notification
+        if: steps.changes.outputs.changes == 'true'
+        run: echo "New post generated and pushed!"

@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import ThemeToggle from './ThemeToggle';
 
 export default function Sidebar() {
     const pathname = usePathname();
@@ -50,8 +51,9 @@ export default function Sidebar() {
                     <div className="ai-status">
                         <div className="ai-status-dot connected"></div>
                         <span>Gemini AI 연결됨</span>
+                        <ThemeToggle />
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8 }}>v4.0 · Mega Upgrade</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8 }}>v5.0 · Mega Merge</div>
                 </div>
             </aside>
         </>
