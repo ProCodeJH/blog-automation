@@ -35,14 +35,28 @@ export default function Dashboard() {
   });
   const maxWeek = Math.max(1, ...weekData);
 
+  // Monthly trend
+  const monthData = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now);
+    d.setMonth(d.getMonth() - (5 - i));
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return { label: `${d.getMonth() + 1}월`, count: posts.filter(p => p.createdAt?.startsWith(ym)).length };
+  });
+  const maxMonth = Math.max(1, ...monthData.map(m => m.count));
+
+  // Tone breakdown
+  const toneMap = {};
+  posts.forEach(p => { toneMap[p.tone || 'friendly'] = (toneMap[p.tone || 'friendly'] || 0) + 1; });
+  const toneIcons = { friendly: '😊', professional: '💼', humorous: '😂', emotional: '💕' };
+
   const recentPosts = [...posts].sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt)).slice(0, 5);
 
   const quickActions = [
     { icon: '✏️', label: '새 글 작성', href: '/editor', desc: 'AI 파워블로거 에디터', color: 'var(--accent-primary)' },
+    { icon: '🧠', label: 'AI 플래너', href: '/planner', desc: '7일 콘텐츠 전략', color: '#a855f7' },
     { icon: '📋', label: '게시물 관리', href: '/posts', desc: `${stats.total}개 저장됨`, color: 'var(--info)' },
-    { icon: '🎬', label: '유튜브 업로드', href: '/youtube', desc: 'AI 메타 자동 생성', color: '#ff0000' },
+    { icon: '🎬', label: '유튜브', href: '/youtube', desc: 'AI 메타 자동 생성', color: '#ff0000' },
     { icon: '📊', label: '분석', href: '/analytics', desc: 'SEO & 차트', color: 'var(--success)' },
-    { icon: '📅', label: '캘린더', href: '/calendar', desc: '발행 스케줄', color: 'var(--accent-secondary)' },
     { icon: '⚙️', label: '설정', href: '/settings', desc: '4 플랫폼 연동', color: 'var(--text-muted)' },
   ];
 
@@ -50,7 +64,7 @@ export default function Dashboard() {
     <div>
       <div className="page-header">
         <h2>🏠 대시보드</h2>
-        <p>BlogFlow v3.0 · AI 파워블로거 콘텐츠 시스템</p>
+        <p>BlogFlow v4.0 · AI 파워블로거 콘텐츠 시스템</p>
       </div>
 
       {/* Stats */}
@@ -90,27 +104,91 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Right: Weekly + Recent */}
+        {/* Right Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Weekly Trend Mini Chart */}
-          <div className="card">
-            <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📈 주간 활동</h3>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 50 }}>
-              {weekData.map((count, i) => (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <div style={{
-                    width: '100%',
-                    maxWidth: 28,
-                    height: `${Math.max(3, (count / maxWeek) * 40)}px`,
-                    background: count > 0 ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                    borderRadius: 3,
-                    transition: 'height 0.3s ease',
-                  }} />
-                  <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>
-                    {['일', '월', '화', '수', '목', '금', '토'][(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6 + i)).getDay()]}
-                  </span>
+          {/* Charts Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {/* Weekly Trend */}
+            <div className="card">
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📈 주간 활동</h3>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 48 }}>
+                {weekData.map((count, i) => (
+                  <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                    <div style={{
+                      width: '100%', maxWidth: 22,
+                      height: `${Math.max(3, (count / maxWeek) * 38)}px`,
+                      background: count > 0 ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                      borderRadius: 3, transition: 'height 0.3s ease',
+                    }} />
+                    <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>
+                      {['일', '월', '화', '수', '목', '금', '토'][(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6 + i)).getDay()]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Monthly Trend */}
+            <div className="card">
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📊 월별 추이</h3>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 48 }}>
+                {monthData.map((m, i) => (
+                  <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                    <div style={{
+                      width: '100%', maxWidth: 22,
+                      height: `${Math.max(3, (m.count / maxMonth) * 38)}px`,
+                      background: m.count > 0 ? 'var(--accent-secondary)' : 'var(--bg-tertiary)',
+                      borderRadius: 3,
+                    }} />
+                    <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>{m.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Tone + Status Overview */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {/* Status Distribution */}
+            <div className="card">
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>📋 상태 분포</h3>
+              {stats.total > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {[
+                    { label: '발행', count: stats.published, color: 'var(--success)' },
+                    { label: '준비', count: stats.ready, color: 'var(--info)' },
+                    { label: '예약', count: stats.scheduled, color: 'var(--accent-secondary)' },
+                    { label: '초안', count: stats.draft, color: 'var(--text-muted)' },
+                  ].filter(s => s.count > 0).map(s => (
+                    <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                      <span style={{ minWidth: 28 }}>{s.label}</span>
+                      <div style={{ flex: 1, height: 6, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ width: `${(s.count / stats.total) * 100}%`, height: '100%', background: s.color, borderRadius: 3 }} />
+                      </div>
+                      <span style={{ minWidth: 16, textAlign: 'right', color: 'var(--text-muted)' }}>{s.count}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', padding: 12 }}>데이터 없음</div>}
+            </div>
+
+            {/* Tone Usage */}
+            <div className="card">
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>🎭 톤 사용량</h3>
+              {Object.keys(toneMap).length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {Object.entries(toneMap).sort((a, b) => b[1] - a[1]).map(([t, c]) => (
+                    <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                      <span>{toneIcons[t] || '📝'}</span>
+                      <span style={{ minWidth: 44 }}>{t}</span>
+                      <div style={{ flex: 1, height: 6, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ width: `${(c / stats.total) * 100}%`, height: '100%', background: 'var(--accent-primary)', borderRadius: 3 }} />
+                      </div>
+                      <span style={{ minWidth: 16, textAlign: 'right', color: 'var(--text-muted)' }}>{c}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', padding: 12 }}>데이터 없음</div>}
             </div>
           </div>
 
@@ -130,7 +208,7 @@ export default function Dashboard() {
                 <Link href="/editor" className="btn btn-primary" style={{ marginTop: 8, display: 'inline-block', textDecoration: 'none', fontSize: 12 }}>✏️ 첫 글 작성</Link>
               </div>
             ) : (
-              <div className="posts-list" style={{ maxHeight: 200, overflow: 'auto' }}>
+              <div className="posts-list" style={{ maxHeight: 180, overflow: 'auto' }}>
                 {recentPosts.map((p) => (
                   <div key={p.id} className="post-card" style={{ padding: '10px 12px' }}>
                     <div style={{ flex: 1 }}>

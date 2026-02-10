@@ -22,7 +22,6 @@ export default function EditorPage() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState('');
     const [isSaving, setIsSaving] = useState(false);
-    const [saveMessage, setSaveMessage] = useState('');
 
     // Keyword Research
     const [showKeywords, setShowKeywords] = useState(false);
@@ -42,6 +41,21 @@ export default function EditorPage() {
     // Edit mode
     const [showLoadModal, setShowLoadModal] = useState(false);
     const [existingPosts, setExistingPosts] = useState([]);
+
+    // v4: SEO Panel
+    const [seoResult, setSeoResult] = useState(null);
+    const [seoKeyword, setSeoKeyword] = useState('');
+
+    // v4: Title A/B
+    const [showTitleAB, setShowTitleAB] = useState(false);
+    const [titleCandidates, setTitleCandidates] = useState([]);
+    const [isGeneratingTitles, setIsGeneratingTitles] = useState(false);
+
+    // v4: Batch Publish
+    const [showPublish, setShowPublish] = useState(false);
+    const [publishPlatforms, setPublishPlatforms] = useState({ wordpress: false, tistory: false });
+    const [publishStatus, setPublishStatus] = useState({});
+    const [isPublishing, setIsPublishing] = useState(false);
 
     const fileInputRef = useRef(null);
     const autoSaveTimer = useRef(null);
@@ -83,7 +97,7 @@ export default function EditorPage() {
             try {
                 const draft = JSON.parse(saved);
                 const age = Date.now() - (draft.savedAt || 0);
-                if (age < 86400000) { // 24h
+                if (age < 86400000) {
                     setTitle(draft.title || '');
                     setRawText(draft.rawText || '');
                     setCategory(draft.category || '');
@@ -116,6 +130,105 @@ export default function EditorPage() {
     const showToast = (msg) => {
         setToastMessage(msg);
         setTimeout(() => setToastMessage(''), 3000);
+    };
+
+    // ── v4: Real-time content stats ──
+    const getStats = () => {
+        const text = rawText || '';
+        const charCount = text.length;
+        const charNoSpace = text.replace(/\s/g, '').length;
+        const readingTime = Math.max(1, Math.round(charCount / 500));
+        return { charCount, charNoSpace, readingTime };
+    };
+    const stats = getStats();
+
+    // ── v4: Run SEO analysis ──
+    const runSeoAnalysis = async () => {
+        if (!aiResult) return;
+        try {
+            const res = await fetch('/api/seo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: aiResult.title,
+                    content: aiResult.content,
+                    metaDescription: aiResult.metaDescription,
+                    tags: aiResult.tags || manualTags,
+                    images: aiResult.uploadedImages || [],
+                    keyword: seoKeyword || category,
+                }),
+            });
+            const data = await res.json();
+            if (data.success) setSeoResult(data);
+        } catch (e) { /* silent */ }
+    };
+
+    // Auto-run SEO when aiResult changes
+    useEffect(() => {
+        if (aiResult) runSeoAnalysis();
+    }, [aiResult]);
+
+    // ── v4: Title A/B Test ──
+    const handleTitleAB = async () => {
+        const topic = title || rawText.slice(0, 100);
+        if (!topic.trim()) { showToast('❌ 제목 또는 본문을 먼저 입력하세요'); return; }
+        setIsGeneratingTitles(true);
+        setTitleCandidates([]);
+        try {
+            const res = await fetch('/api/ai/titles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ topic, category, tone }),
+            });
+            const data = await res.json();
+            if (data.success && data.titles) {
+                setTitleCandidates(data.titles);
+                setShowTitleAB(true);
+            } else { showToast('❌ 제목 생성 실패'); }
+        } catch (e) { showToast('❌ ' + e.message); }
+        finally { setIsGeneratingTitles(false); }
+    };
+
+    // ── v4: Batch Publish ──
+    const handleBatchPublish = async () => {
+        const platforms = Object.entries(publishPlatforms).filter(([, v]) => v).map(([k]) => k);
+        if (platforms.length === 0) { showToast('❌ 플랫폼을 선택하세요'); return; }
+        if (!aiResult) { showToast('❌ AI 편집 결과가 없습니다'); return; }
+
+        setIsPublishing(true);
+        const settings = JSON.parse(localStorage.getItem('blogflow_settings') || '{}');
+        const results = {};
+
+        for (const platform of platforms) {
+            try {
+                setPublishStatus(prev => ({ ...prev, [platform]: 'publishing' }));
+                const res = await fetch('/api/publish', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        platform,
+                        title: aiResult.title,
+                        content: aiResult.content,
+                        tags: aiResult.tags || manualTags,
+                        credentials: platform === 'wordpress'
+                            ? { url: settings.wpUrl, username: settings.wpUser, password: settings.wpPass }
+                            : platform === 'tistory'
+                                ? { accessToken: settings.tsToken, blogName: settings.tsBlogName }
+                                : {},
+                    }),
+                });
+                const data = await res.json();
+                results[platform] = data.success ? 'success' : 'error';
+                setPublishStatus(prev => ({ ...prev, [platform]: data.success ? 'success' : 'error' }));
+            } catch (e) {
+                results[platform] = 'error';
+                setPublishStatus(prev => ({ ...prev, [platform]: 'error' }));
+            }
+        }
+
+        const successCount = Object.values(results).filter(r => r === 'success').length;
+        showToast(`✅ ${successCount}/${platforms.length} 플랫폼 발행 완료`);
+        setIsPublishing(false);
     };
 
     // ── Image Handlers ──
@@ -207,7 +320,7 @@ export default function EditorPage() {
                 let content = data.data.content;
                 uploadedImages.forEach((img, i) => {
                     const placeholder = new RegExp(`\\[IMAGE_${i + 1}\\]|<div class="blog-image" data-index="${i + 1}"></div>`, 'g');
-                    content = content.replace(placeholder, `<div style="text-align:center;margin:24px 0"><img src="${img.url}" alt="${img.memo || `이미지 ${i + 1}`}" style="max-width:100%;border-radius:12px"><p style="text-align:center;font-size:13px;color:#888;margin-top:8px">${img.memo || ''}</p></div>`);
+                    content = content.replace(placeholder, `<div style="text-align:center;margin:24px 0"><img src="${img.optimizedUrl || img.url}" alt="${img.memo || `이미지 ${i + 1}`}" style="max-width:100%;border-radius:12px"><p style="text-align:center;font-size:13px;color:#888;margin-top:8px">${img.memo || ''}</p></div>`);
                 });
                 setAiResult({ ...data.data, content, uploadedImages });
                 showToast('✅ AI 편집 완료!');
@@ -234,7 +347,7 @@ export default function EditorPage() {
                     rawText, content: aiResult?.content || '', metaDescription: aiResult?.metaDescription || '',
                     tags: aiResult?.tags || manualTags, images: aiResult?.uploadedImages || [],
                     tone, category, templateId, status,
-                    seoScore: aiResult?.seoScore || 0,
+                    seoScore: seoResult?.score || aiResult?.seoScore || 0,
                     scheduledAt: (scheduledDate && scheduledTime) ? `${scheduledDate}T${scheduledTime}:00` : null,
                 }),
             });
@@ -284,7 +397,7 @@ export default function EditorPage() {
         }
         try {
             await navigator.clipboard.writeText(text);
-            showToast(`✅ ${format === 'html' ? 'HTML' : '마크다운'} 복사 완료! 블로그에 붙여넣기 하세요`);
+            showToast(`✅ ${format === 'html' ? 'HTML' : '마크다운'} 복사 완료!`);
         } catch (e) {
             showToast('❌ 복사 실패');
         }
@@ -317,12 +430,13 @@ export default function EditorPage() {
     const handleNewPost = () => {
         setPostId(null); setTitle(''); setRawText(''); setCategory(''); setTone('friendly');
         setTemplateId(''); setImages([]); setManualTags([]); setAiResult(null);
-        setCustomPrompt(''); setError('');
+        setCustomPrompt(''); setError(''); setSeoResult(null); setTitleCandidates([]);
         localStorage.removeItem('blogflow_draft');
         showToast('✨ 새 글 시작');
     };
 
     const getSeoClass = (score) => score >= 80 ? 'seo-good' : score >= 50 ? 'seo-ok' : 'seo-bad';
+    const getSeoIcon = (status) => status === 'good' ? '✅' : status === 'warn' ? '⚠️' : '❌';
 
     return (
         <div>
@@ -360,6 +474,30 @@ export default function EditorPage() {
                 </div>
             )}
 
+            {/* Title A/B Modal */}
+            {showTitleAB && titleCandidates.length > 0 && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowTitleAB(false)}>
+                    <div className="card" style={{ width: 550, maxHeight: '70vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
+                        <h3 style={{ marginBottom: 4 }}>🔬 제목 A/B 테스트</h3>
+                        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>클릭하여 제목 적용</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            {titleCandidates.map((t, i) => (
+                                <div key={i} className="post-card" style={{ cursor: 'pointer', padding: 14 }} onClick={() => { setTitle(t.title); if (aiResult) setAiResult({ ...aiResult, title: t.title }); setShowTitleAB(false); showToast('✅ 제목 적용'); }}>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>{t.title}</div>
+                                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+                                            <span style={{ fontSize: 11, padding: '2px 8px', background: 'var(--accent-primary)', color: '#fff', borderRadius: 20, fontWeight: 600 }}>CTR {t.estimatedCTR || '?'}%</span>
+                                            <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: 20 }}>{t.style}</span>
+                                        </div>
+                                        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{t.reason}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="page-header">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
@@ -369,9 +507,25 @@ export default function EditorPage() {
                     <div style={{ display: 'flex', gap: 8 }}>
                         <button className="btn btn-ghost btn-sm" onClick={handleNewPost}>✨ 새 글</button>
                         <button className="btn btn-ghost btn-sm" onClick={loadExistingPosts}>📂 불러오기</button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => setShowKeywords(!showKeywords)}>🔍 키워드 리서치</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setShowKeywords(!showKeywords)}>🔍 키워드</button>
+                        <button className="btn btn-ghost btn-sm" onClick={handleTitleAB} disabled={isGeneratingTitles}>
+                            {isGeneratingTitles ? '⏳' : '🔬'} 제목 A/B
+                        </button>
                     </div>
                 </div>
+            </div>
+
+            {/* v4: Real-time Stats Bar */}
+            <div style={{ display: 'flex', gap: 16, padding: '8px 16px', background: 'var(--bg-secondary)', borderRadius: 10, marginBottom: 12, fontSize: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span>📝 <b>{stats.charCount}</b>자</span>
+                <span>📖 <b>{stats.readingTime}</b>분</span>
+                <span>📷 <b>{images.length}</b>장</span>
+                <span>🏷️ <b>{manualTags.length}</b>태그</span>
+                {seoResult && <span style={{ color: seoResult.score >= 80 ? 'var(--success)' : seoResult.score >= 50 ? 'hsl(45,100%,50%)' : 'var(--error)' }}>🎯 SEO <b>{seoResult.score}</b> ({seoResult.grade})</span>}
+                <div style={{ flex: 1 }} />
+                {rawText.length > 0 && <span style={{ color: stats.charCount >= 2000 ? 'var(--success)' : stats.charCount >= 1000 ? 'hsl(45,100%,50%)' : 'var(--text-muted)' }}>
+                    {stats.charCount >= 2000 ? '✅ 충분한 분량' : stats.charCount >= 1000 ? '⚠️ 조금 짧음' : '📏 2000자 이상 권장'}
+                </span>}
             </div>
 
             {/* Keyword Research Panel */}
@@ -407,11 +561,6 @@ export default function EditorPage() {
                                     </div>
                                 ))}
                             </div>
-                            {keywordResult.contentStrategy && (
-                                <div style={{ gridColumn: '1/-1', background: 'rgba(59,130,246,0.08)', padding: 12, borderRadius: 8, fontSize: 13, color: 'var(--text-secondary)' }}>
-                                    <span style={{ fontWeight: 600, color: 'var(--info)' }}>📊 전략: </span>{keywordResult.contentStrategy}
-                                </div>
-                            )}
                         </div>
                     )}
                 </div>
@@ -441,7 +590,7 @@ export default function EditorPage() {
 
                             {/* Title */}
                             <div className="form-group">
-                                <label className="form-label">제목</label>
+                                <label className="form-label">제목 <span style={{ fontSize: 11, color: title.length > 60 ? 'var(--error)' : title.length >= 15 ? 'var(--success)' : 'var(--text-muted)' }}>({title.length}자)</span></label>
                                 <input type="text" className="form-input" placeholder="예: 서울 맛집 투어, 신혼여행 후기..." value={title} onChange={(e) => setTitle(e.target.value)} />
                             </div>
 
@@ -463,7 +612,7 @@ export default function EditorPage() {
 
                             {/* Content */}
                             <div className="form-group">
-                                <label className="form-label">본문 (대략적으로 써주세요)</label>
+                                <label className="form-label">본문 (대략적으로 써주세요) <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{stats.charCount}자 · {stats.readingTime}분</span></label>
                                 <textarea className="form-input form-textarea" placeholder="여기에 대략적인 내용을 적어주세요. 키워드, 메모, 핵심 내용 등 자유롭게 작성하면 AI가 파워블로거 스타일로 변환합니다." value={rawText} onChange={(e) => setRawText(e.target.value)} rows={8} />
                             </div>
 
@@ -473,7 +622,7 @@ export default function EditorPage() {
                                     {showCustomPrompt ? '🔽' : '▶️'} AI에게 추가 지시사항
                                 </button>
                                 {showCustomPrompt && (
-                                    <textarea className="form-input" style={{ minHeight: 80, marginTop: 6 }} placeholder="예: 사진 설명을 더 자세히 해줘, 비교 표를 추가해줘, 가격 정보를 강조해줘..." value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} />
+                                    <textarea className="form-input" style={{ minHeight: 80, marginTop: 6 }} placeholder="예: 사진 설명을 더 자세히 해줘, 비교 표를 추가해줘..." value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} />
                                 )}
                             </div>
 
@@ -483,7 +632,7 @@ export default function EditorPage() {
                                 <div className={`image-uploader ${isDragging ? 'dragging' : ''}`} onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onClick={() => fileInputRef.current?.click()}>
                                     <div className="upload-icon">📷</div>
                                     <div className="upload-text">클릭 또는 드래그앤드롭</div>
-                                    <div className="upload-hint">JPG, PNG, WebP · 여러 장 한번에</div>
+                                    <div className="upload-hint">JPG, PNG, WebP · 자동 WebP 변환 & 압축</div>
                                     <input ref={fileInputRef} type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={(e) => handleFileSelect(Array.from(e.target.files))} />
                                 </div>
                                 {images.length > 0 && (
@@ -534,6 +683,7 @@ export default function EditorPage() {
                                     <button className="btn btn-ghost btn-sm" onClick={handleGenerate} disabled={isGenerating}>🔄</button>
                                     <button className="btn btn-ghost btn-sm" onClick={() => setShowExport(!showExport)}>📤</button>
                                     <button className="btn btn-ghost btn-sm" onClick={() => setShowSchedule(!showSchedule)}>📅</button>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => setShowPublish(!showPublish)}>🌐</button>
                                     <button className="btn btn-primary btn-sm" onClick={() => handleSave('ready')} disabled={isSaving}>
                                         {isSaving ? '...' : '💾 저장'}
                                     </button>
@@ -544,9 +694,9 @@ export default function EditorPage() {
                         {/* Export Bar */}
                         {showExport && aiResult && (
                             <div style={{ padding: '8px 24px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                <button className="btn btn-secondary btn-sm" onClick={() => copyToClipboard('html')}>📋 HTML 복사 (네이버/티스토리)</button>
-                                <button className="btn btn-secondary btn-sm" onClick={() => copyToClipboard('markdown')}>📝 마크다운 복사 (벨로그)</button>
-                                <button className="btn btn-secondary btn-sm" onClick={() => { handleSave('draft'); showToast('✅ 초안 저장 완료'); }}>💾 초안 저장</button>
+                                <button className="btn btn-secondary btn-sm" onClick={() => copyToClipboard('html')}>📋 HTML 복사</button>
+                                <button className="btn btn-secondary btn-sm" onClick={() => copyToClipboard('markdown')}>📝 마크다운</button>
+                                <button className="btn btn-secondary btn-sm" onClick={() => { handleSave('draft'); }}>💾 초안 저장</button>
                             </div>
                         )}
 
@@ -562,6 +712,37 @@ export default function EditorPage() {
                             </div>
                         )}
 
+                        {/* v4: Batch Publish Panel */}
+                        {showPublish && aiResult && (
+                            <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border)' }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>🌐 멀티 플랫폼 발행</div>
+                                <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
+                                    {[
+                                        { key: 'wordpress', label: 'WordPress', icon: 'W', color: '#21759b' },
+                                        { key: 'tistory', label: '티스토리', icon: 'T', color: '#f36f21' },
+                                    ].map(p => (
+                                        <label key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, padding: '6px 12px', borderRadius: 8, background: publishPlatforms[p.key] ? p.color + '20' : 'var(--bg-tertiary)', border: `1px solid ${publishPlatforms[p.key] ? p.color : 'var(--border)'}`, transition: 'all 0.2s' }}>
+                                            <input type="checkbox" checked={publishPlatforms[p.key]} onChange={(e) => setPublishPlatforms(prev => ({ ...prev, [p.key]: e.target.checked }))} style={{ display: 'none' }} />
+                                            <span style={{ fontWeight: 800, color: p.color }}>{p.icon}</span>
+                                            <span>{p.label}</span>
+                                            {publishStatus[p.key] && (
+                                                <span style={{ fontSize: 11 }}>
+                                                    {publishStatus[p.key] === 'publishing' ? '⏳' : publishStatus[p.key] === 'success' ? '✅' : '❌'}
+                                                </span>
+                                            )}
+                                        </label>
+                                    ))}
+                                    <button className="btn btn-primary btn-sm" onClick={handleBatchPublish} disabled={isPublishing} style={{ marginLeft: 'auto' }}>
+                                        {isPublishing ? '발행 중...' : '🚀 발행'}
+                                    </button>
+                                </div>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => copyToClipboard('html')}>📋 네이버 (HTML 복사)</button>
+                                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => copyToClipboard('markdown')}>📝 벨로그 (MD 복사)</button>
+                                </div>
+                            </div>
+                        )}
+
                         {isGenerating ? (
                             <div className="ai-generating">
                                 <div style={{ fontSize: 48 }}>🤖</div>
@@ -573,14 +754,42 @@ export default function EditorPage() {
                             </div>
                         ) : aiResult ? (
                             <div style={{ padding: 24 }}>
-                                {/* SEO Score */}
-                                <div className="seo-score">
-                                    <div className={`seo-score-circle ${getSeoClass(aiResult.seoScore)}`}>{aiResult.seoScore}</div>
-                                    <div>
-                                        <div style={{ fontSize: 13, fontWeight: 600 }}>SEO 점수</div>
-                                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{aiResult.seoScore >= 80 ? '훌륭합니다!' : aiResult.seoScore >= 50 ? '개선 여지 있음' : '최적화 필요'}</div>
+                                {/* v4: Detailed SEO Panel */}
+                                {seoResult ? (
+                                    <div style={{ marginBottom: 16, padding: 16, background: 'var(--bg-tertiary)', borderRadius: 12 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                                            <div className={`seo-score-circle ${getSeoClass(seoResult.score)}`}>{seoResult.score}</div>
+                                            <div>
+                                                <div style={{ fontSize: 14, fontWeight: 700 }}>SEO 점수: {seoResult.grade}</div>
+                                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                                    {seoResult.stats?.charCount}자 · {seoResult.stats?.readingTime}분 · {seoResult.stats?.imgCount}이미지 · {seoResult.stats?.headingCount}소제목
+                                                </div>
+                                            </div>
+                                            <div style={{ flex: 1 }} />
+                                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                                <input type="text" className="form-input" style={{ width: 120, padding: '4px 8px', fontSize: 11 }} placeholder="SEO 키워드" value={seoKeyword} onChange={(e) => setSeoKeyword(e.target.value)} />
+                                                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={runSeoAnalysis}>분석</button>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                                            {seoResult.checks?.map((c, i) => (
+                                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '3px 0' }}>
+                                                    <span>{getSeoIcon(c.status)}</span>
+                                                    <span style={{ color: 'var(--text-secondary)', minWidth: 80 }}>{c.label}</span>
+                                                    <span style={{ color: 'var(--text-muted)' }}>{c.detail}</span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="seo-score">
+                                        <div className={`seo-score-circle ${getSeoClass(aiResult.seoScore)}`}>{aiResult.seoScore}</div>
+                                        <div>
+                                            <div style={{ fontSize: 13, fontWeight: 600 }}>SEO 점수</div>
+                                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>분석 중...</div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Meta */}
                                 {aiResult.metaDescription && (

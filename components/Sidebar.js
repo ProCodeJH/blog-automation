@@ -11,6 +11,7 @@ export default function Sidebar() {
         { href: '/', icon: '🏠', label: '대시보드' },
         { href: '/editor', icon: '✏️', label: '글 작성' },
         { href: '/posts', icon: '📋', label: '게시물 관리' },
+        { href: '/planner', icon: '🧠', label: 'AI 플래너' },
         { href: '/calendar', icon: '📅', label: '캘린더' },
         { href: '/analytics', icon: '📊', label: '분석' },
         { href: '/youtube', icon: '🎬', label: '유튜브' },
@@ -50,7 +51,7 @@ export default function Sidebar() {
                         <div className="ai-status-dot connected"></div>
                         <span>Gemini AI 연결됨</span>
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8 }}>v2.0 · Phase 20+</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8 }}>v4.0 · Mega Upgrade</div>
                 </div>
             </aside>
         </>
