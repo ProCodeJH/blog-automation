@@ -1,0 +1,28 @@
+[
+  {
+    "id": "comment_1770708631315_ens6f6",
+    "postId": null,
+    "parentId": null,
+    "author": "???",
+    "content": "?? ????! ?????",
+    "sentiment": "neutral",
+    "sentimentConfidence": 0.5,
+    "isSpam": false,
+    "isApproved": true,
+    "createdAt": "2026-02-10T07:30:31.315Z",
+    "replies": []
+  },
+  {
+    "id": "comment_1770708746505_xj9jte",
+    "postId": null,
+    "parentId": null,
+    "author": "???",
+    "content": "?? ?? ?? ?? http://spam.com ????",
+    "sentiment": "neutral",
+    "sentimentConfidence": 0.5,
+    "isSpam": false,
+    "isApproved": true,
+    "createdAt": "2026-02-10T07:32:26.505Z",
+    "replies": []
+  }
+]
