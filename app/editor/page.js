@@ -70,6 +70,12 @@ export default function EditorPage() {
     const [showHistory, setShowHistory] = useState(false);
     const [historyVersions, setHistoryVersions] = useState([]);
 
+    // v6: AI Thumbnail (⑤)
+    const [showThumbnail, setShowThumbnail] = useState(false);
+    const [thumbnailData, setThumbnailData] = useState(null);
+    const [thumbnailStyle, setThumbnailStyle] = useState('modern');
+    const [isGenThumbnail, setIsGenThumbnail] = useState(false);
+
     const fileInputRef = useRef(null);
     const autoSaveTimer = useRef(null);
 
@@ -861,6 +867,15 @@ export default function EditorPage() {
                         setIsRepurposing(false);
                     }}>📱 SNS 리퍼포징</button>
                     <button className="btn btn-ghost btn-sm" onClick={() => setShowPreview(true)}>👁️ 플랫폼 미리보기</button>
+                    <button className="btn btn-ghost btn-sm" onClick={async () => {
+                        setIsGenThumbnail(true); setShowThumbnail(true);
+                        try {
+                            const res = await fetch('/api/ai/image-gen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: aiResult.title || title, category, tags: aiResult.tags || manualTags, style: thumbnailStyle }) });
+                            const d = await res.json();
+                            if (d.success) setThumbnailData(d.thumbnail);
+                        } catch { }
+                        setIsGenThumbnail(false);
+                    }}>🎨 AI 썸네일</button>
                     {postId && <button className="btn btn-ghost btn-sm" onClick={async () => {
                         const res = await fetch(`/api/posts?history=${postId}`);
                         const d = await res.json();
@@ -951,6 +966,50 @@ export default function EditorPage() {
                                 ))}
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* ─── v6 AI Thumbnail Modal ─── */}
+            {showThumbnail && (
+                <div className="modal-overlay" onClick={() => setShowThumbnail(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <h3 style={{ fontSize: 16, fontWeight: 700 }}>🎨 AI 썸네일</h3>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setShowThumbnail(false)}>✕</button>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+                            {['modern', 'warm', 'nature', 'ocean', 'minimal'].map(s => (
+                                <button key={s} className={`tone-chip ${thumbnailStyle === s ? 'active' : ''}`} onClick={async () => {
+                                    setThumbnailStyle(s); setIsGenThumbnail(true);
+                                    try {
+                                        const res = await fetch('/api/ai/image-gen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: aiResult?.title || title, category, tags: aiResult?.tags || manualTags, style: s }) });
+                                        const d = await res.json();
+                                        if (d.success) setThumbnailData(d.thumbnail);
+                                    } catch { }
+                                    setIsGenThumbnail(false);
+                                }}>{s}</button>
+                            ))}
+                        </div>
+                        {isGenThumbnail ? (
+                            <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>⏳ 생성 중...</div>
+                        ) : thumbnailData ? (
+                            <div>
+                                <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-color)', marginBottom: 12 }} dangerouslySetInnerHTML={{ __html: thumbnailData.svg }} />
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                    <button className="btn btn-primary btn-sm" onClick={() => {
+                                        const blob = new Blob([thumbnailData.svg], { type: 'image/svg+xml' });
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement('a'); a.href = url; a.download = 'thumbnail.svg'; a.click();
+                                    }}>📥 SVG 다운로드</button>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => {
+                                        navigator.clipboard.writeText(thumbnailData.svg);
+                                    }}>📋 SVG 복사</button>
+                                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{thumbnailData.width}x{thumbnailData.height}</span>
+                                </div>
+                                {thumbnailData.altText && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>Alt: {thumbnailData.altText}</div>}
+                            </div>
+                        ) : null}
                     </div>
                 </div>
             )}

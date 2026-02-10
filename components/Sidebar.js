@@ -14,6 +14,7 @@ export default function Sidebar() {
         { href: '/posts', icon: '📋', label: '게시물 관리' },
         { href: '/planner', icon: '🧠', label: 'AI 플래너' },
         { href: '/calendar', icon: '📅', label: '캘린더' },
+        { href: '/comments', icon: '💬', label: '댓글 관리' },
         { href: '/analytics', icon: '📊', label: '분석' },
         { href: '/youtube', icon: '🎬', label: '유튜브' },
         { href: '/settings', icon: '⚙️', label: '설정' },
@@ -53,7 +54,7 @@ export default function Sidebar() {
                         <span>Gemini AI 연결됨</span>
                         <ThemeToggle />
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8 }}>v5.0 · Mega Merge</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8 }}>v6.0 · Full Platform</div>
                 </div>
             </aside>
         </>

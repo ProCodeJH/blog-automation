@@ -1,0 +1,38 @@
+name: 📊 Weekly SEO Report
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'  # Every Monday 3:00 UTC (12:00 KST)
+  workflow_dispatch:
+
+jobs:
+  seo-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 🔧 Install dependencies
+        run: npm ci
+
+      - name: 📊 Generate SEO Report
+        run: node scripts/seo-report.js
+
+      - name: 🔍 Check for changes
+        id: changes
+        run: |
+          git diff --quiet || echo "changes=true" >> $GITHUB_OUTPUT
+
+      - name: 💾 Commit and push report
+        if: steps.changes.outputs.changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git add -A
+          git commit -m "📊 Weekly SEO Report - $(date +'%Y-%m-%d')"
+          git push

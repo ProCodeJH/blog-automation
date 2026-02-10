@@ -244,6 +244,41 @@ export default function AnalyticsPage() {
                         ))}
                     </div>
                 </div>
+
+                {/* Google Analytics Status */}
+                <div className="card">
+                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>📈 Google Analytics</h3>
+                    <div style={{ textAlign: 'center', padding: 16 }}>
+                        <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>GA4 연동</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
+                            설정에서 GA4 Measurement ID를 입력하고<br />
+                            <code>.env.local</code>에 추가하세요
+                        </div>
+                        <a href="/settings" style={{ fontSize: 12, color: 'var(--accent-primary)', textDecoration: 'none' }}>
+                            ⚙️ 설정으로 이동
+                        </a>
+                    </div>
+                </div>
+
+                {/* SEO Report */}
+                <div className="card">
+                    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>🔍 SEO 점검 리포트</h3>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+                        <div>• 매주 월요일 자동 점검 (GitHub Actions)</div>
+                        <div>• 수동 실행: <code>node scripts/seo-report.js</code></div>
+                        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                            <div style={{ flex: 1, padding: 12, background: 'var(--bg-tertiary)', borderRadius: 8, textAlign: 'center' }}>
+                                <div style={{ fontSize: 20, fontWeight: 700, color: avgSeo >= 80 ? 'var(--success)' : 'hsl(45,100%,50%)' }}>{avgSeo}</div>
+                                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>평균 SEO</div>
+                            </div>
+                            <div style={{ flex: 1, padding: 12, background: 'var(--bg-tertiary)', borderRadius: 8, textAlign: 'center' }}>
+                                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--error)' }}>{posts.filter(p => (p.seoScore || 0) < 50).length}</div>
+                                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>개선 필요</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );

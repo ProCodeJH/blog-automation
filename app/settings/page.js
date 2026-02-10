@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 
 export default function SettingsPage() {
     const [geminiKey, setGeminiKey] = useState('');
+    const [gaId, setGaId] = useState('');
     const [theme, setTheme] = useState('dark');
 
     // WordPress
@@ -29,6 +30,7 @@ export default function SettingsPage() {
         if (saved) {
             const s = JSON.parse(saved);
             setGeminiKey(s.geminiKey || '');
+            setGaId(s.gaId || '');
             setWpUrl(s.wpUrl || '');
             setWpUser(s.wpUser || '');
             setWpPass(s.wpPass || '');
@@ -47,7 +49,7 @@ export default function SettingsPage() {
 
     const handleSave = () => {
         localStorage.setItem('blogflow_settings', JSON.stringify({
-            geminiKey, wpUrl, wpUser, wpPass,
+            geminiKey, gaId, wpUrl, wpUser, wpPass,
             tsToken, tsBlogName,
             ytClientId, ytClientSecret, ytAccessToken, ytRefreshToken,
             masterPromptOverride,
@@ -66,7 +68,7 @@ export default function SettingsPage() {
         { key: 'wordpress', icon: 'W', label: 'WordPress', desc: 'REST API', color: '#21759b', status: wpUrl ? 'connected' : 'disconnected' },
         { key: 'tistory', icon: 'T', label: '티스토리', desc: 'Open API', color: '#f36f21', status: tsToken ? 'connected' : 'disconnected' },
         { key: 'youtube', icon: '▶', label: 'YouTube', desc: 'Data API v3', color: '#ff0000', status: ytAccessToken ? 'connected' : 'disconnected' },
-        { key: 'naver', icon: 'N', label: '네이버 블로그', desc: 'API 없음 (클립보드 복사)', color: '#03c75a', status: 'clipboard' },
+        { key: 'naver', icon: 'N', label: '네이버 블로그', desc: 'HTML 생성 + 클립보드 복사', color: '#03c75a', status: 'connected' },
     ];
 
     return (
@@ -86,6 +88,21 @@ export default function SettingsPage() {
                             <input type="password" className="form-input" placeholder="AIza..." value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} />
                             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                                 <a href="https://aistudio.google.com/apikey" target="_blank" style={{ color: 'var(--info)' }}>Google AI Studio</a>에서 발급
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* GA4 */}
+                    <div className="card settings-section">
+                        <h3>📊 Google Analytics</h3>
+                        <div className="form-group">
+                            <label className="form-label">GA4 Measurement ID</label>
+                            <input type="text" className="form-input" placeholder="G-XXXXXXXXXX" value={gaId} onChange={(e) => setGaId(e.target.value)} />
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                <a href="https://analytics.google.com" target="_blank" style={{ color: 'var(--info)' }}>Google Analytics</a> → 관리 → 데이터 스트림 → Measurement ID
+                            </span>
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginTop: 4 }}>
+                                ⚠️ 서버 적용: <code>.env.local</code>에 <code>NEXT_PUBLIC_GA_MEASUREMENT_ID={gaId || 'G-XXXXXXXXXX'}</code> 추가
                             </span>
                         </div>
                     </div>

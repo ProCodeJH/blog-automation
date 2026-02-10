@@ -1,5 +1,6 @@
 import { publishToWordPress } from '../../../lib/platforms/wordpress';
 import { publishToTistory } from '../../../lib/platforms/tistory';
+import { generateNaverHTML, generateNaverSmartEditorHTML } from '../../../lib/platforms/naver';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
@@ -38,11 +39,21 @@ export async function POST(request) {
                 });
                 break;
 
-            case 'naver':
-                return NextResponse.json({
-                    success: false,
-                    error: '네이버 블로그는 글 작성 API를 제공하지 않습니다. 에디터에서 HTML 복사 후 붙여넣기 해주세요.',
-                }, { status: 501 });
+            case 'naver': {
+                // 네이버는 API가 없으므로 최적화 HTML을 생성하여 반환
+                const naverHTML = generateNaverHTML(post);
+                const smartEditorHTML = generateNaverSmartEditorHTML(post);
+                result = {
+                    success: true,
+                    platform: 'naver',
+                    message: '네이버 블로그용 HTML이 생성되었습니다. 클립보드에 복사하여 붙여넣기하세요.',
+                    html: naverHTML.html,
+                    smartEditorHTML: smartEditorHTML,
+                    plainText: naverHTML.plainText,
+                    tags: naverHTML.tags,
+                };
+                break;
+            }
 
             case 'velog':
                 return NextResponse.json({ success: false, error: '벨로그는 마크다운 복사 후 붙여넣기 해주세요.' }, { status: 501 });
