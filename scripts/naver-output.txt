@@ -1,0 +1,24 @@
+﻿=== 理쒖쥌 諛쒗뻾 寃利?(?대?吏 ?ы븿) ===
+
+[Naver] 1/7 ?먮뵒???묒냽...
+[Naver] 2/7 ?앹뾽 泥섎━...
+[Naver] 3/7 ?쒕ぉ ?낅젰...
+[Naver] 4/7 蹂몃Ц ?곸뿭 ?대룞...
+  蹂몃Ц ?대┃: paragraph
+[Naver] 5/7 ?대?吏 1媛??낅줈??..
+  ?대?吏 踰꾪듉 ?대┃ ?꾨즺
+  ?뚯씪 ?좏깮: C:\Users\louis\.gemini\antigravity\scratch\blog-automation\scripts\test-image.png
+  ?대?吏 濡쒕뱶 ?꾨즺
+[Naver] 5.5/7 蹂몃Ц ?띿뒪???낅젰...
+[Naver] 6/7 諛쒗뻾 踰꾪듉 ?대┃...
+[Naver] 7/7 諛쒗뻾 ?ㅼ젙 + ?쒓렇...
+  ?쒓렇 2媛??낅젰 ?꾨즺
+  諛쒗뻾 ?대┃: confirm:諛쒗뻾
+[Naver] ??諛쒗뻾 ?깃났: https://blog.naver.com/louispetergu/224179751068
+
+=== 寃곌낵 ===
+{
+  "success": true,
+  "postUrl": "https://blog.naver.com/louispetergu/224179751068",
+  "logNo": "224179751068"
+}

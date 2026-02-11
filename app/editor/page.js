@@ -53,24 +53,24 @@ export default function EditorPage() {
 
     // v4: Batch Publish
     const [showPublish, setShowPublish] = useState(false);
-    const [publishPlatforms, setPublishPlatforms] = useState({ wordpress: false, tistory: false });
+    const [publishPlatforms, setPublishPlatforms] = useState({ naver: false, wordpress: false, tistory: false });
     const [publishStatus, setPublishStatus] = useState({});
     const [isPublishing, setIsPublishing] = useState(false);
 
-    // v5: Platform Preview (⑨)
+    // v5: Platform Preview
     const [showPreview, setShowPreview] = useState(false);
     const [previewPlatform, setPreviewPlatform] = useState('naver');
 
-    // v5: Repurpose (①)
+    // v5: Repurpose
     const [showRepurpose, setShowRepurpose] = useState(false);
     const [repurposeResult, setRepurposeResult] = useState(null);
     const [isRepurposing, setIsRepurposing] = useState(false);
 
-    // v5: Version History (⑧)
+    // v5: Version History
     const [showHistory, setShowHistory] = useState(false);
     const [historyVersions, setHistoryVersions] = useState([]);
 
-    // v6: AI Thumbnail (⑤)
+    // v6: AI Thumbnail
     const [showThumbnail, setShowThumbnail] = useState(false);
     const [thumbnailData, setThumbnailData] = useState(null);
     const [thumbnailStyle, setThumbnailStyle] = useState('modern');
@@ -80,22 +80,22 @@ export default function EditorPage() {
     const autoSaveTimer = useRef(null);
 
     const tones = [
-        { key: 'friendly', label: '😊 친근한' },
-        { key: 'professional', label: '💼 전문적' },
-        { key: 'humorous', label: '😂 유머러스' },
-        { key: 'emotional', label: '💕 감성적' },
+        { key: 'friendly', label: '친근한' },
+        { key: 'professional', label: '전문적' },
+        { key: 'humorous', label: '유머러스' },
+        { key: 'emotional', label: '감성적' },
     ];
 
     const templates = [
-        { id: '', label: '📄 기본', desc: '범용' },
-        { id: 'restaurant', label: '🍽️ 맛집', desc: '맛집 리뷰' },
-        { id: 'travel', label: '✈️ 여행', desc: '여행 후기' },
-        { id: 'product', label: '📦 제품', desc: '제품 리뷰' },
-        { id: 'tech', label: '💻 IT', desc: '테크/개발' },
-        { id: 'daily', label: '📝 일상', desc: '에세이' },
-        { id: 'beauty', label: '💄 뷰티', desc: '화장품/패션' },
-        { id: 'recipe', label: '🍳 요리', desc: '레시피' },
-        { id: 'parenting', label: '👶 육아', desc: '육아/교육' },
+        { id: '', label: '기본', desc: '범용' },
+        { id: 'restaurant', label: '맛집', desc: '맛집 리뷰' },
+        { id: 'travel', label: '여행', desc: '여행 후기' },
+        { id: 'product', label: '제품', desc: '제품 리뷰' },
+        { id: 'tech', label: 'IT', desc: '테크/개발' },
+        { id: 'daily', label: '일상', desc: '에세이' },
+        { id: 'beauty', label: '뷰티', desc: '화장품/패션' },
+        { id: 'recipe', label: '요리', desc: '레시피' },
+        { id: 'parenting', label: '육아', desc: '육아/교육' },
     ];
 
     // ── Auto-save (every 30s) ──
@@ -190,7 +190,7 @@ export default function EditorPage() {
     // ── v4: Title A/B Test ──
     const handleTitleAB = async () => {
         const topic = title || rawText.slice(0, 100);
-        if (!topic.trim()) { showToast('❌ 제목 또는 본문을 먼저 입력하세요'); return; }
+        if (!topic.trim()) { showToast('제목 또는 본문을 먼저 입력하세요'); return; }
         setIsGeneratingTitles(true);
         setTitleCandidates([]);
         try {
@@ -203,42 +203,57 @@ export default function EditorPage() {
             if (data.success && data.titles) {
                 setTitleCandidates(data.titles);
                 setShowTitleAB(true);
-            } else { showToast('❌ 제목 생성 실패'); }
-        } catch (e) { showToast('❌ ' + e.message); }
+            } else { showToast('제목 생성 실패'); }
+        } catch (e) { showToast(e.message); }
         finally { setIsGeneratingTitles(false); }
     };
 
     // ── v4: Batch Publish ──
     const handleBatchPublish = async () => {
         const platforms = Object.entries(publishPlatforms).filter(([, v]) => v).map(([k]) => k);
-        if (platforms.length === 0) { showToast('❌ 플랫폼을 선택하세요'); return; }
-        if (!aiResult) { showToast('❌ AI 편집 결과가 없습니다'); return; }
+        if (platforms.length === 0) { showToast('플랫폼을 선택하세요'); return; }
+        if (!aiResult) { showToast('AI 편집 결과가 없습니다'); return; }
 
         setIsPublishing(true);
         const settings = JSON.parse(localStorage.getItem('blogflow_settings') || '{}');
         const results = {};
 
+        // 업로드된 이미지 경로 수집 (네이버 Puppeteer용)
+        const imagePaths = (aiResult.uploadedImages || []).map(img => img.originalUrl || img.url).filter(Boolean);
+
         for (const platform of platforms) {
             try {
                 setPublishStatus(prev => ({ ...prev, [platform]: 'publishing' }));
+
+                let credentials = {};
+                if (platform === 'wordpress') {
+                    credentials = { siteUrl: settings.wpUrl, username: settings.wpUser, appPassword: settings.wpPass };
+                } else if (platform === 'tistory') {
+                    credentials = { accessToken: settings.tsToken, blogName: settings.tsBlogName };
+                } else if (platform === 'naver') {
+                    credentials = { naverBlogId: settings.naverBlogId };
+                }
+
                 const res = await fetch('/api/publish', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         platform,
-                        title: aiResult.title,
-                        content: aiResult.content,
-                        tags: aiResult.tags || manualTags,
-                        credentials: platform === 'wordpress'
-                            ? { url: settings.wpUrl, username: settings.wpUser, password: settings.wpPass }
-                            : platform === 'tistory'
-                                ? { accessToken: settings.tsToken, blogName: settings.tsBlogName }
-                                : {},
+                        credentials,
+                        post: {
+                            title: aiResult.title,
+                            content: aiResult.content,
+                            tags: aiResult.tags || manualTags,
+                            imagePaths,
+                        },
                     }),
                 });
                 const data = await res.json();
                 results[platform] = data.success ? 'success' : 'error';
                 setPublishStatus(prev => ({ ...prev, [platform]: data.success ? 'success' : 'error' }));
+                if (data.success && data.postUrl) {
+                    showToast(`${platform}: ${data.postUrl}`);
+                }
             } catch (e) {
                 results[platform] = 'error';
                 setPublishStatus(prev => ({ ...prev, [platform]: 'error' }));
@@ -246,7 +261,7 @@ export default function EditorPage() {
         }
 
         const successCount = Object.values(results).filter(r => r === 'success').length;
-        showToast(`✅ ${successCount}/${platforms.length} 플랫폼 발행 완료`);
+        showToast(`${successCount}/${platforms.length} 플랫폼 발행 완료`);
         setIsPublishing(false);
     };
 
@@ -342,7 +357,7 @@ export default function EditorPage() {
                     content = content.replace(placeholder, `<div style="text-align:center;margin:24px 0"><img src="${img.optimizedUrl || img.url}" alt="${img.memo || `이미지 ${i + 1}`}" style="max-width:100%;border-radius:12px"><p style="text-align:center;font-size:13px;color:#888;margin-top:8px">${img.memo || ''}</p></div>`);
                 });
                 setAiResult({ ...data.data, content, uploadedImages });
-                showToast('✅ AI 편집 완료!');
+                showToast('AI 편집 완료');
             } else {
                 setError(data.error || 'AI 편집에 실패했습니다.');
             }
@@ -373,11 +388,11 @@ export default function EditorPage() {
             const data = await res.json();
             if (data.success) {
                 setPostId(data.post.id);
-                showToast(`✅ "${data.post.title}" ${status === 'draft' ? '초안 저장' : status === 'scheduled' ? '예약 설정' : '저장'} 완료!`);
+                showToast(`"${data.post.title}" ${status === 'draft' ? '초안 저장' : status === 'scheduled' ? '예약 설정' : '저장'} 완료`);
                 localStorage.removeItem('blogflow_draft');
             }
         } catch (err) {
-            showToast('❌ 저장 실패: ' + err.message);
+            showToast('저장 실패: ' + err.message);
         } finally {
             setIsSaving(false);
         }
@@ -396,9 +411,9 @@ export default function EditorPage() {
             });
             const data = await res.json();
             if (data.success) setKeywordResult(data.data);
-            else showToast('❌ 키워드 분석 실패');
+            else showToast('키워드 분석 실패');
         } catch (err) {
-            showToast('❌ ' + err.message);
+            showToast(err.message);
         } finally {
             setIsAnalyzingKeywords(false);
         }
@@ -416,9 +431,9 @@ export default function EditorPage() {
         }
         try {
             await navigator.clipboard.writeText(text);
-            showToast(`✅ ${format === 'html' ? 'HTML' : '마크다운'} 복사 완료!`);
+            showToast(`${format === 'html' ? 'HTML' : '마크다운'} 복사 완료`);
         } catch (e) {
-            showToast('❌ 복사 실패');
+            showToast('복사 실패');
         }
     };
 
@@ -442,7 +457,7 @@ export default function EditorPage() {
             setAiResult({ title: post.title, content: post.content, metaDescription: post.metaDescription, tags: post.tags, seoScore: post.seoScore, uploadedImages: post.images });
         }
         setShowLoadModal(false);
-        showToast('✅ 글 불러오기 완료');
+        showToast('글 불러오기 완료');
     };
 
     // ── New post ──
@@ -451,18 +466,18 @@ export default function EditorPage() {
         setTemplateId(''); setImages([]); setManualTags([]); setAiResult(null);
         setCustomPrompt(''); setError(''); setSeoResult(null); setTitleCandidates([]);
         localStorage.removeItem('blogflow_draft');
-        showToast('✨ 새 글 시작');
+        showToast('새 글 시작');
     };
 
     const getSeoClass = (score) => score >= 80 ? 'seo-good' : score >= 50 ? 'seo-ok' : 'seo-bad';
-    const getSeoIcon = (status) => status === 'good' ? '✅' : status === 'warn' ? '⚠️' : '❌';
+    const getSeoIcon = (status) => status === 'good' ? 'good' : status === 'warn' ? 'warn' : 'bad';
 
     return (
         <div>
             {/* Toast */}
             {toastMessage && (
                 <div className="toast-container">
-                    <div className={`toast ${toastMessage.startsWith('✅') ? 'toast-success' : toastMessage.startsWith('❌') ? 'toast-error' : 'toast-info'}`}>
+                    <div className={`toast ${toastMessage.includes('실패') || toastMessage.includes('오류') ? 'toast-error' : toastMessage.includes('완료') || toastMessage.includes('적용') || toastMessage.includes('추가') ? 'toast-success' : 'toast-info'}`}>
                         {toastMessage}
                     </div>
                 </div>
@@ -470,9 +485,12 @@ export default function EditorPage() {
 
             {/* Load Modal */}
             {showLoadModal && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowLoadModal(false)}>
-                    <div className="card" style={{ width: 500, maxHeight: '70vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
-                        <h3 style={{ marginBottom: 16 }}>📂 글 불러오기</h3>
+                <div className="modal-overlay" onClick={() => setShowLoadModal(false)}>
+                    <div className="modal-content" style={{ width: 500 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>글 불러오기</h3>
+                            <button className="modal-close" onClick={() => setShowLoadModal(false)}>×</button>
+                        </div>
                         {existingPosts.length === 0 ? (
                             <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>저장된 글이 없습니다</p>
                         ) : (
@@ -495,13 +513,18 @@ export default function EditorPage() {
 
             {/* Title A/B Modal */}
             {showTitleAB && titleCandidates.length > 0 && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowTitleAB(false)}>
-                    <div className="card" style={{ width: 550, maxHeight: '70vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
-                        <h3 style={{ marginBottom: 4 }}>🔬 제목 A/B 테스트</h3>
-                        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>클릭하여 제목 적용</p>
+                <div className="modal-overlay" onClick={() => setShowTitleAB(false)}>
+                    <div className="modal-content" style={{ width: 550 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <div>
+                                <h3>제목 A/B 테스트</h3>
+                                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>클릭하여 제목 적용</p>
+                            </div>
+                            <button className="modal-close" onClick={() => setShowTitleAB(false)}>×</button>
+                        </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                             {titleCandidates.map((t, i) => (
-                                <div key={i} className="post-card" style={{ cursor: 'pointer', padding: 14 }} onClick={() => { setTitle(t.title); if (aiResult) setAiResult({ ...aiResult, title: t.title }); setShowTitleAB(false); showToast('✅ 제목 적용'); }}>
+                                <div key={i} className="post-card" style={{ cursor: 'pointer', padding: 14 }} onClick={() => { setTitle(t.title); if (aiResult) setAiResult({ ...aiResult, title: t.title }); setShowTitleAB(false); showToast('제목 적용 완료'); }}>
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>{t.title}</div>
                                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
@@ -520,30 +543,33 @@ export default function EditorPage() {
             <div className="page-header">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                        <h2>✏️ 글 작성하기</h2>
+                        <h2>글 작성하기</h2>
                         <p>러프한 초안 → AI 파워블로거 편집 · <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Ctrl+S 저장 · Ctrl+Enter 생성 · 30초 자동저장</span></p>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn btn-ghost btn-sm" onClick={handleNewPost}>✨ 새 글</button>
-                        <button className="btn btn-ghost btn-sm" onClick={loadExistingPosts}>📂 불러오기</button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => setShowKeywords(!showKeywords)}>🔍 키워드</button>
+                        <button className="btn btn-ghost btn-sm" onClick={handleNewPost}>새 글</button>
+                        <button className="btn btn-ghost btn-sm" onClick={loadExistingPosts}>불러오기</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setShowKeywords(!showKeywords)}>키워드</button>
                         <button className="btn btn-ghost btn-sm" onClick={handleTitleAB} disabled={isGeneratingTitles}>
-                            {isGeneratingTitles ? '⏳' : '🔬'} 제목 A/B
+                            {isGeneratingTitles ? '...' : '제목 A/B'}
                         </button>
                     </div>
                 </div>
             </div>
 
             {/* v4: Real-time Stats Bar */}
-            <div style={{ display: 'flex', gap: 16, padding: '8px 16px', background: 'var(--bg-secondary)', borderRadius: 10, marginBottom: 12, fontSize: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span>📝 <b>{stats.charCount}</b>자</span>
-                <span>📖 <b>{stats.readingTime}</b>분</span>
-                <span>📷 <b>{images.length}</b>장</span>
-                <span>🏷️ <b>{manualTags.length}</b>태그</span>
-                {seoResult && <span style={{ color: seoResult.score >= 80 ? 'var(--success)' : seoResult.score >= 50 ? 'hsl(45,100%,50%)' : 'var(--error)' }}>🎯 SEO <b>{seoResult.score}</b> ({seoResult.grade})</span>}
+            <div className="stats-inline">
+                <span className="stat-item"><b>{stats.charCount}</b>자</span>
+                <span className="stat-divider" />
+                <span className="stat-item"><b>{stats.readingTime}</b>분</span>
+                <span className="stat-divider" />
+                <span className="stat-item"><b>{images.length}</b>장</span>
+                <span className="stat-divider" />
+                <span className="stat-item"><b>{manualTags.length}</b>태그</span>
+                {seoResult && <><span className="stat-divider" /><span className="stat-item" style={{ color: seoResult.score >= 80 ? 'var(--success)' : seoResult.score >= 50 ? 'var(--warning)' : 'var(--error)' }}>SEO <b>{seoResult.score}</b> ({seoResult.grade})</span></>}
                 <div style={{ flex: 1 }} />
-                {rawText.length > 0 && <span style={{ color: stats.charCount >= 2000 ? 'var(--success)' : stats.charCount >= 1000 ? 'hsl(45,100%,50%)' : 'var(--text-muted)' }}>
-                    {stats.charCount >= 2000 ? '✅ 충분한 분량' : stats.charCount >= 1000 ? '⚠️ 조금 짧음' : '📏 2000자 이상 권장'}
+                {rawText.length > 0 && <span className="stat-item" style={{ color: stats.charCount >= 2000 ? 'var(--success)' : stats.charCount >= 1000 ? 'var(--warning)' : 'var(--text-muted)' }}>
+                    {stats.charCount >= 2000 ? '충분한 분량' : stats.charCount >= 1000 ? '조금 짧음' : '2000자 이상 권장'}
                 </span>}
             </div>
 
@@ -551,7 +577,7 @@ export default function EditorPage() {
             {showKeywords && (
                 <div className="card" style={{ marginBottom: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                        <h3 style={{ fontSize: 15, fontWeight: 600 }}>🔍 키워드 리서치</h3>
+                        <h3 style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>키워드 리서치</h3>
                         <button className="btn btn-ghost btn-sm" onClick={() => setShowKeywords(false)}>닫기</button>
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -563,19 +589,19 @@ export default function EditorPage() {
                     {keywordResult && (
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                             <div style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 8 }}>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-secondary)', marginBottom: 8 }}>📌 관련 키워드</div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-hover)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>관련 키워드</div>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                                     {(keywordResult.relatedKeywords || []).map((k, i) => (
-                                        <span key={i} className="tag" style={{ cursor: 'pointer' }} onClick={() => { setManualTags(prev => [...new Set([...prev, k.keyword])]); showToast(`✅ "${k.keyword}" 태그 추가`); }}>
+                                        <span key={i} className="tag" style={{ cursor: 'pointer' }} onClick={() => { setManualTags(prev => [...new Set([...prev, k.keyword])]); showToast(`"${k.keyword}" 태그 추가`); }}>
                                             {k.keyword} <span style={{ fontSize: 9, opacity: 0.6 }}>({k.searchVolume})</span>
                                         </span>
                                     ))}
                                 </div>
                             </div>
                             <div style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 8 }}>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-secondary)', marginBottom: 8 }}>💡 추천 제목</div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-hover)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>추천 제목</div>
                                 {(keywordResult.suggestedTitle || []).map((t, i) => (
-                                    <div key={i} style={{ fontSize: 13, marginBottom: 4, cursor: 'pointer', padding: '4px 8px', borderRadius: 4 }} className="post-card" onClick={() => { setTitle(t); showToast('✅ 제목 적용'); }}>
+                                    <div key={i} style={{ fontSize: 13, marginBottom: 4, cursor: 'pointer', padding: '4px 8px', borderRadius: 4 }} className="post-card" onClick={() => { setTitle(t); showToast('제목 적용 완료'); }}>
                                         {t}
                                     </div>
                                 ))}
@@ -590,7 +616,7 @@ export default function EditorPage() {
                 <div className="editor-panel">
                     <div className="card" style={{ overflow: 'auto' }}>
                         <div className="editor-panel-header">
-                            <h3>📝 초안 입력</h3>
+                            <h3>초안 입력</h3>
                             {postId && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>편집 중: {postId.slice(0, 8)}...</span>}
                         </div>
 
@@ -638,7 +664,7 @@ export default function EditorPage() {
                             {/* Custom Prompt */}
                             <div className="form-group">
                                 <button className="btn btn-ghost btn-sm" onClick={() => setShowCustomPrompt(!showCustomPrompt)} style={{ alignSelf: 'flex-start' }}>
-                                    {showCustomPrompt ? '🔽' : '▶️'} AI에게 추가 지시사항
+                                    {showCustomPrompt ? '−' : '+'} 추가 지시사항
                                 </button>
                                 {showCustomPrompt && (
                                     <textarea className="form-input" style={{ minHeight: 80, marginTop: 6 }} placeholder="예: 사진 설명을 더 자세히 해줘, 비교 표를 추가해줘..." value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} />
@@ -649,7 +675,7 @@ export default function EditorPage() {
                             <div className="form-group">
                                 <label className="form-label">사진 ({images.length}장) · 드래그로 순서 변경</label>
                                 <div className={`image-uploader ${isDragging ? 'dragging' : ''}`} onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onClick={() => fileInputRef.current?.click()}>
-                                    <div className="upload-icon">📷</div>
+                                    <div className="upload-icon">↑</div>
                                     <div className="upload-text">클릭 또는 드래그앤드롭</div>
                                     <div className="upload-hint">JPG, PNG, WebP · 자동 WebP 변환 & 압축</div>
                                     <input ref={fileInputRef} type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={(e) => handleFileSelect(Array.from(e.target.files))} />
@@ -682,11 +708,11 @@ export default function EditorPage() {
                             </div>
 
                             {/* Error */}
-                            {error && <div style={{ color: 'var(--error)', fontSize: 13, padding: '8px 12px', background: 'rgba(239,68,68,0.1)', borderRadius: 8 }}>⚠️ {error}</div>}
+                            {error && <div style={{ color: 'var(--error)', fontSize: 13, padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 6 }}>{error}</div>}
 
                             {/* Generate Button */}
                             <button className="btn btn-primary btn-lg" onClick={handleGenerate} disabled={isGenerating || !rawText.trim()} style={{ width: '100%' }}>
-                                {isGenerating ? <><span className="spinner"></span> AI 편집 중...</> : '🤖 AI 편집 시작 (Ctrl+Enter)'}
+                                {isGenerating ? <><span className="spinner"></span> 편집 중...</> : 'AI 편집 시작'}
                             </button>
                         </div>
                     </div>
@@ -696,15 +722,15 @@ export default function EditorPage() {
                 <div className="editor-panel">
                     <div className="preview-panel">
                         <div className="preview-header">
-                            <h3 style={{ fontSize: 15, fontWeight: 600 }}>👁️ 미리보기</h3>
+                            <h3 style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>미리보기</h3>
                             {aiResult && (
                                 <div style={{ display: 'flex', gap: 6 }}>
-                                    <button className="btn btn-ghost btn-sm" onClick={handleGenerate} disabled={isGenerating}>🔄</button>
-                                    <button className="btn btn-ghost btn-sm" onClick={() => setShowExport(!showExport)}>📤</button>
-                                    <button className="btn btn-ghost btn-sm" onClick={() => setShowSchedule(!showSchedule)}>📅</button>
-                                    <button className="btn btn-ghost btn-sm" onClick={() => setShowPublish(!showPublish)}>🌐</button>
+                                    <button className="btn btn-ghost btn-sm" onClick={handleGenerate} disabled={isGenerating}>재생성</button>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => setShowExport(!showExport)}>내보내기</button>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => setShowSchedule(!showSchedule)}>예약</button>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => setShowPublish(!showPublish)}>발행</button>
                                     <button className="btn btn-primary btn-sm" onClick={() => handleSave('ready')} disabled={isSaving}>
-                                        {isSaving ? '...' : '💾 저장'}
+                                        {isSaving ? '...' : '저장'}
                                     </button>
                                 </div>
                             )}
@@ -713,16 +739,16 @@ export default function EditorPage() {
                         {/* Export Bar */}
                         {showExport && aiResult && (
                             <div style={{ padding: '8px 24px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                <button className="btn btn-secondary btn-sm" onClick={() => copyToClipboard('html')}>📋 HTML 복사</button>
-                                <button className="btn btn-secondary btn-sm" onClick={() => copyToClipboard('markdown')}>📝 마크다운</button>
-                                <button className="btn btn-secondary btn-sm" onClick={() => { handleSave('draft'); }}>💾 초안 저장</button>
+                                <button className="btn btn-secondary btn-sm" onClick={() => copyToClipboard('html')}>HTML 복사</button>
+                                <button className="btn btn-secondary btn-sm" onClick={() => copyToClipboard('markdown')}>마크다운</button>
+                                <button className="btn btn-secondary btn-sm" onClick={() => { handleSave('draft'); }}>초안 저장</button>
                             </div>
                         )}
 
                         {/* Schedule Bar */}
                         {showSchedule && aiResult && (
                             <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center' }}>
-                                <span style={{ fontSize: 13, fontWeight: 600 }}>📅 예약:</span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>예약</span>
                                 <input type="date" className="form-input" style={{ width: 'auto', padding: '6px 10px' }} value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} />
                                 <input type="time" className="form-input" style={{ width: 'auto', padding: '6px 10px' }} value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} />
                                 <button className="btn btn-primary btn-sm" onClick={() => handleSave('scheduled')} disabled={!scheduledDate || !scheduledTime}>
@@ -734,9 +760,10 @@ export default function EditorPage() {
                         {/* v4: Batch Publish Panel */}
                         {showPublish && aiResult && (
                             <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border)' }}>
-                                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>🌐 멀티 플랫폼 발행</div>
+                                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>플랫폼 발행</div>
                                 <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
                                     {[
+                                        { key: 'naver', label: '네이버', icon: 'N', color: '#03c75a' },
                                         { key: 'wordpress', label: 'WordPress', icon: 'W', color: '#21759b' },
                                         { key: 'tistory', label: '티스토리', icon: 'T', color: '#f36f21' },
                                     ].map(p => (
@@ -746,29 +773,29 @@ export default function EditorPage() {
                                             <span>{p.label}</span>
                                             {publishStatus[p.key] && (
                                                 <span style={{ fontSize: 11 }}>
-                                                    {publishStatus[p.key] === 'publishing' ? '⏳' : publishStatus[p.key] === 'success' ? '✅' : '❌'}
+                                                    {publishStatus[p.key] === 'publishing' ? <span className="spinner" style={{ width: 12, height: 12 }} /> : publishStatus[p.key] === 'success' ? <span className="status-dot-indicator dot-good" /> : <span className="status-dot-indicator dot-bad" />}
                                                 </span>
                                             )}
                                         </label>
                                     ))}
                                     <button className="btn btn-primary btn-sm" onClick={handleBatchPublish} disabled={isPublishing} style={{ marginLeft: 'auto' }}>
-                                        {isPublishing ? '발행 중...' : '🚀 발행'}
+                                        {isPublishing ? '발행 중...' : '발행'}
                                     </button>
                                 </div>
                                 <div style={{ display: 'flex', gap: 8 }}>
-                                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => copyToClipboard('html')}>📋 네이버 (HTML 복사)</button>
-                                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => copyToClipboard('markdown')}>📝 벨로그 (MD 복사)</button>
+                                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => copyToClipboard('html')}>HTML 복사</button>
+                                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }} onClick={() => copyToClipboard('markdown')}>MD 복사</button>
                                 </div>
                             </div>
                         )}
 
                         {isGenerating ? (
                             <div className="ai-generating">
-                                <div style={{ fontSize: 48 }}>🤖</div>
-                                <p>파워블로거 스타일로 편집 중...</p>
+
+                                <p style={{ fontWeight: 500 }}>AI 편집 중</p>
                                 <div className="dots"><span></span><span></span><span></span></div>
                                 <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
-                                    {templateId ? `🎯 ${templates.find(t => t.id === templateId)?.label} 템플릿 적용 중` : 'Gemini AI 작업 중'}
+                                    {templateId ? `${templates.find(t => t.id === templateId)?.label} 템플릿 적용 중` : '잠시만 기다려주세요'}
                                 </p>
                             </div>
                         ) : aiResult ? (
@@ -793,7 +820,7 @@ export default function EditorPage() {
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
                                             {seoResult.checks?.map((c, i) => (
                                                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '3px 0' }}>
-                                                    <span>{getSeoIcon(c.status)}</span>
+                                                    <span className={`status-dot-indicator dot-${getSeoIcon(c.status)}`}></span>
                                                     <span style={{ color: 'var(--text-secondary)', minWidth: 80 }}>{c.label}</span>
                                                     <span style={{ color: 'var(--text-muted)' }}>{c.detail}</span>
                                                 </div>
@@ -835,14 +862,14 @@ export default function EditorPage() {
                                 {/* SEO Tips */}
                                 {aiResult.seoTips?.length > 0 && (
                                     <div style={{ marginTop: 12, padding: 12, background: 'rgba(59,130,246,0.08)', borderRadius: 8 }}>
-                                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--info)' }}>💡 SEO 개선</div>
+                                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--info)' }}>SEO 개선 제안</div>
                                         {aiResult.seoTips.map((tip, i) => <div key={i} style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 3 }}>• {tip}</div>)}
                                     </div>
                                 )}
                             </div>
                         ) : (
                             <div className="preview-placeholder">
-                                <div className="preview-placeholder-icon">✨</div>
+                                <div className="preview-placeholder-icon" style={{ fontSize: 36, opacity: 0.15, letterSpacing: 4 }}>···</div>
                                 <div>
                                     <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>AI 편집 결과가 여기에 표시됩니다</p>
                                     <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>초안 입력 → AI 편집 시작 클릭</p>
@@ -856,7 +883,7 @@ export default function EditorPage() {
             {/* ─── v5 Action Bar ─── */}
             {aiResult && (
                 <div className="card" style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>v5 도구:</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>도구</span>
                     <button className="btn btn-ghost btn-sm" onClick={async () => {
                         setIsRepurposing(true); setShowRepurpose(true);
                         try {
@@ -865,8 +892,8 @@ export default function EditorPage() {
                             if (d.success) setRepurposeResult(d.repurposed);
                         } catch { }
                         setIsRepurposing(false);
-                    }}>📱 SNS 리퍼포징</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setShowPreview(true)}>👁️ 플랫폼 미리보기</button>
+                    }}>SNS 변환</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setShowPreview(true)}>플랫폼 미리보기</button>
                     <button className="btn btn-ghost btn-sm" onClick={async () => {
                         setIsGenThumbnail(true); setShowThumbnail(true);
                         try {
@@ -875,22 +902,56 @@ export default function EditorPage() {
                             if (d.success) setThumbnailData(d.thumbnail);
                         } catch { }
                         setIsGenThumbnail(false);
-                    }}>🎨 AI 썸네일</button>
+                    }}>썸네일 생성</button>
                     {postId && <button className="btn btn-ghost btn-sm" onClick={async () => {
                         const res = await fetch(`/api/posts?history=${postId}`);
                         const d = await res.json();
                         if (d.success) { setHistoryVersions(d.versions || []); setShowHistory(true); }
-                    }}>📜 버전 히스토리</button>}
+                    }}>히스토리</button>}
+                    <div style={{ flex: 1 }} />
+                    <button className="btn btn-primary btn-sm" onClick={() => setShowPublish(true)}>발행</button>
                 </div>
             )}
 
-            {/* ⑨ Platform Preview Modal */}
+            {/* Publish Modal */}
+            {showPublish && (
+                <div className="modal-overlay" onClick={() => setShowPublish(false)}>
+                    <div className="modal-content" style={{ width: 440 }} onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>플랫폼 발행</h3>
+                            <button className="modal-close" onClick={() => setShowPublish(false)}>×</button>
+                        </div>
+                        <p className="text-caption" style={{ marginBottom: 14 }}>발행할 플랫폼을 선택하세요. 설정에서 인증 정보를 먼저 등록해야 합니다.</p>
+                        <div className="platform-grid">
+                            {[{ key: 'naver', name: '네이버 블로그', desc: 'Puppeteer 자동 발행' }, { key: 'wordpress', name: 'WordPress', desc: 'REST API 발행' }, { key: 'tistory', name: '티스토리', desc: 'Open API 발행' }].map(p => (
+                                <div key={p.key} className={`platform-card ${publishPlatforms[p.key] ? 'selected' : ''}`} onClick={() => setPublishPlatforms(prev => ({ ...prev, [p.key]: !prev[p.key] }))}>
+                                    <div className="platform-icon" style={{ background: publishPlatforms[p.key] ? 'var(--accent-muted)' : 'var(--bg-tertiary)', color: publishPlatforms[p.key] ? 'var(--accent-hover)' : 'var(--text-muted)' }}>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></svg>
+                                    </div>
+                                    <div className="platform-info">
+                                        <h4>{p.name}</h4>
+                                        <span>{publishStatus[p.key] === 'publishing' ? '발행 중...' : publishStatus[p.key] === 'success' ? '완료' : publishStatus[p.key] === 'error' ? '실패' : p.desc}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setShowPublish(false)}>취소</button>
+                            <button className="btn btn-primary btn-sm" onClick={handleBatchPublish} disabled={isPublishing}>
+                                {isPublishing ? '발행 중...' : '발행하기'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Platform Preview Modal */}
             {showPreview && aiResult && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowPreview(false)}>
-                    <div className="card" style={{ width: '90%', maxWidth: 800, maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                <div className="modal-overlay" onClick={() => setShowPreview(false)}>
+                    <div className="modal-content" style={{ width: '90%', maxWidth: 800 }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <h3 style={{ fontSize: 16, fontWeight: 700 }}>👁️ 플랫폼별 미리보기</h3>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setShowPreview(false)}>✕</button>
+                            <h3 style={{ fontSize: 14, fontWeight: 600 }}>플랫폼별 미리보기</h3>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setShowPreview(false)}>×</button>
                         </div>
                         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
                             {[{ k: 'naver', l: '네이버' }, { k: 'tistory', l: '티스토리' }, { k: 'velog', l: 'Velog' }, { k: 'wordpress', l: 'WordPress' }].map(p => (
@@ -916,13 +977,13 @@ export default function EditorPage() {
                 </div>
             )}
 
-            {/* ① Repurpose Modal */}
+            {/* Repurpose Modal */}
             {showRepurpose && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowRepurpose(false)}>
-                    <div className="card" style={{ width: '90%', maxWidth: 700, maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                <div className="modal-overlay" onClick={() => setShowRepurpose(false)}>
+                    <div className="modal-content" style={{ width: '90%', maxWidth: 700 }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <h3 style={{ fontSize: 16, fontWeight: 700 }}>📱 SNS 리퍼포징</h3>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setShowRepurpose(false)}>✕</button>
+                            <h3 style={{ fontSize: 14, fontWeight: 600 }}>SNS 변환</h3>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setShowRepurpose(false)}>×</button>
                         </div>
                         {isRepurposing ? (
                             <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}><div className="spinner" style={{ margin: '0 auto 16px' }} />AI가 각 플랫폼에 맞게 변환 중...</div>
@@ -931,8 +992,8 @@ export default function EditorPage() {
                                 {Object.entries(repurposeResult).map(([platform, text]) => (
                                     <div key={platform} style={{ padding: 14, background: 'var(--bg-tertiary)', borderRadius: 10 }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                            <span style={{ fontSize: 13, fontWeight: 700 }}>{platform === 'instagram' ? '📷 인스타그램' : platform === 'twitter' ? '🐦 트위터/X' : platform === 'linkedin' ? '💼 링크드인' : platform === 'thread' ? '🧵 쓰레드' : '▶️ 유튜브 설명'}</span>
-                                            <button className="btn btn-ghost btn-sm" onClick={() => { navigator.clipboard.writeText(text); }}>📋 복사</button>
+                                            <span style={{ fontSize: 13, fontWeight: 600 }}>{platform === 'instagram' ? '인스타그램' : platform === 'twitter' ? '트위터/X' : platform === 'linkedin' ? '링크드인' : platform === 'thread' ? '스레드' : '유튜브 설명'}</span>
+                                            <button className="btn btn-ghost btn-sm" onClick={() => { navigator.clipboard.writeText(text); }}>복사</button>
                                         </div>
                                         <div style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{text}</div>
                                     </div>
@@ -943,13 +1004,13 @@ export default function EditorPage() {
                 </div>
             )}
 
-            {/* ⑧ Version History Modal */}
+            {/* Version History Modal */}
             {showHistory && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowHistory(false)}>
-                    <div className="card" style={{ width: '90%', maxWidth: 600, maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                <div className="modal-overlay" onClick={() => setShowHistory(false)}>
+                    <div className="modal-content" style={{ width: '90%', maxWidth: 600 }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <h3 style={{ fontSize: 16, fontWeight: 700 }}>📜 버전 히스토리</h3>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setShowHistory(false)}>✕</button>
+                            <h3 style={{ fontSize: 14, fontWeight: 600 }}>버전 히스토리</h3>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setShowHistory(false)}>×</button>
                         </div>
                         {historyVersions.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>이전 버전이 없습니다</div>
@@ -975,8 +1036,8 @@ export default function EditorPage() {
                 <div className="modal-overlay" onClick={() => setShowThumbnail(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <h3 style={{ fontSize: 16, fontWeight: 700 }}>🎨 AI 썸네일</h3>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setShowThumbnail(false)}>✕</button>
+                            <h3 style={{ fontSize: 14, fontWeight: 600 }}>썸네일 생성</h3>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setShowThumbnail(false)}>×</button>
                         </div>
                         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
                             {['modern', 'warm', 'nature', 'ocean', 'minimal'].map(s => (
@@ -992,7 +1053,7 @@ export default function EditorPage() {
                             ))}
                         </div>
                         {isGenThumbnail ? (
-                            <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>⏳ 생성 중...</div>
+                            <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}><div className="spinner" style={{ margin: '0 auto 12px' }} />생성 중...</div>
                         ) : thumbnailData ? (
                             <div>
                                 <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-color)', marginBottom: 12 }} dangerouslySetInnerHTML={{ __html: thumbnailData.svg }} />
@@ -1001,10 +1062,10 @@ export default function EditorPage() {
                                         const blob = new Blob([thumbnailData.svg], { type: 'image/svg+xml' });
                                         const url = URL.createObjectURL(blob);
                                         const a = document.createElement('a'); a.href = url; a.download = 'thumbnail.svg'; a.click();
-                                    }}>📥 SVG 다운로드</button>
+                                    }}>SVG 다운로드</button>
                                     <button className="btn btn-ghost btn-sm" onClick={() => {
                                         navigator.clipboard.writeText(thumbnailData.svg);
-                                    }}>📋 SVG 복사</button>
+                                    }}>SVG 복사</button>
                                     <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{thumbnailData.width}x{thumbnailData.height}</span>
                                 </div>
                                 {thumbnailData.altText && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>Alt: {thumbnailData.altText}</div>}
