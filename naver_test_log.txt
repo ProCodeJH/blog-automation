@@ -1,0 +1,21 @@
+=== Naver Puppeteer Publish Test ===
+Cookie length: 666
+Blog ID: louispetergu
+Time: 2026-02-11T13:34:17.896Z
+
+--- Loading module ---
+Module loaded OK
+
+--- Starting publishToNaverPuppeteer ---
+
+=== RESULT ===
+{
+  "success": false,
+  "error": "발행 완료 확인 불가",
+  "finalUrl": "https://blog.naver.com/louispetergu/postwrite",
+  "message": "수동 확인 필요"
+}
+
+FAILED: 발행 완료 확인 불가
+
+=== Test Complete ===

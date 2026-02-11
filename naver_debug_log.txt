@@ -1,0 +1,29 @@
+[2026-02-11T13:39:30.912Z] === START ===
+[2026-02-11T13:39:46.693Z] Cookies injected: 2
+[2026-02-11T13:39:46.694Z] Step 1: Navigate to editor
+[2026-02-11T13:40:03.954Z] Screenshot: naver_debug_screenshots\01_editor_loaded.png
+[2026-02-11T13:40:03.955Z] URL: https://blog.naver.com/louispetergu/postwrite
+[2026-02-11T13:40:04.017Z] Logged in: true
+[2026-02-11T13:40:08.073Z] Screenshot: naver_debug_screenshots\02_after_wait.png
+[2026-02-11T13:40:08.074Z] Step 2: Handle popup
+[2026-02-11T13:40:08.304Z] Popup: dismissed
+[2026-02-11T13:40:10.018Z] Step 3: Enter title
+[2026-02-11T13:40:14.969Z] Title: Debug Test 1770817212273
+[2026-02-11T13:40:15.502Z] Screenshot: naver_debug_screenshots\03_title_entered.png
+[2026-02-11T13:40:15.507Z] Step 4: Enter content
+[2026-02-11T13:40:20.877Z] Screenshot: naver_debug_screenshots\04_content_entered.png
+[2026-02-11T13:40:20.878Z] Step 5: Find publish button
+[2026-02-11T13:40:21.892Z] Publish buttons found: [{"text":"예약 발행 0건","className":"reserve_btn__Km5Xh","visible":false},{"text":"발행","className":"publish_btn__m9KHH","visible":true}]
+[2026-02-11T13:40:22.099Z] Publish clicked (1st): toolbar:발행
+[2026-02-11T13:40:24.781Z] Screenshot: naver_debug_screenshots\05_after_publish_click.png
+[2026-02-11T13:40:24.782Z] Step 6: Handle publish confirmation
+[2026-02-11T13:40:24.791Z] Visible buttons after publish click: [{"text":"발행","className":"publish_btn__m9KHH","visible":true,"rect":{}},{"text":"외부 공유 허용 도움말외부 공유를 허용하면 등록한 게시","className":"tip__AUuXY","visible":true,"rect":{}},{"text":"발행 설정 닫기","className":"publish_fold_btn__DtZcG","visible":true,"rect":{}},{"text":"발행","className":"confirm_btn__WEaBq","visible":true,"rect":{}}]
+[2026-02-11T13:40:24.898Z] Confirm clicked: ["clicked: 발행 (publish_btn__m9KHH)","clicked: 발행 (confirm_btn__WEaBq)"]
+[2026-02-11T13:40:28.972Z] Screenshot: naver_debug_screenshots\06_after_confirm.png
+[2026-02-11T13:40:28.973Z] Step 7: Any remaining dialogs
+[2026-02-11T13:40:29.374Z] Extra dialogs: []
+[2026-02-11T13:40:35.990Z] Screenshot: naver_debug_screenshots\07_final_state.png
+[2026-02-11T13:40:35.991Z] Final URL: https://blog.naver.com/PostView.naver?blogId=louispetergu&Redirect=View&logNo=224180625497&categoryNo=6&isAfterWrite=true&isMrblogPost=false&isHappyBeanLeverage=true&contentLength=1963
+[2026-02-11T13:40:35.992Z] Success: true
+[2026-02-11T13:40:35.999Z] Page info: {"title":"Debug Test 1770817212273BlogFlow Puppeteer auto publish debug test. : 네이버 블로그","msgs":["",""],"bodyText":"NAVER\n블로그\n이레\n블로그 검색\n이 블로그에서 검색\n  \n \n공감 0\n첫 댓글을 남겨보세요 \n공유하기\n메뉴 바로가기\n본문 바로가기\n이웃블로그 \n블로그 홈 \n내 메뉴  \n사용자 링크\n구자현\n내정보 보기\n서비스 더보기\n블로그 메뉴\n 프롤로그\n 블로그 \n\t\n 지도\n 서재\n 안부\n\t\t\n\t\n코딩 6개의 글\n코딩\n목록열기\n\t\n\t\t\n\t\t\n\t\n코딩\n\nDebug Test 1770817212273BlogFlow Puppeteer auto publish debug test.\n\n 이레 ・ 방금 전\nURL 복사  통계\n \n본문 기타 기능\n\nThis text should appear in the blog.\n\n 공감  \n이 글에 공감한 블로거 열고 닫기\n 댓글 쓰기  \n이 글에 댓글 단 블로거 열고 닫기\n카페 보내기\nKeep 보내기\n메모 보내기\n기타 보내기 펼치기\n수정\n 삭제\n 설정\n\t\n\t\t\n\t\t\n\t\n이 블로그 코딩 카테고리 글\n전체글 보기\n코딩글 목록\n글 제목\n\t\n작성일\n\n\nDebug Test 17708"}
+[2026-02-11T13:40:37.339Z] === DONE ===

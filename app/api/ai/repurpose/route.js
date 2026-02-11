@@ -10,7 +10,7 @@ export async function POST(request) {
         if (!apiKey) return NextResponse.json({ success: false, error: 'GEMINI_API_KEY 미설정' }, { status: 500 });
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
         const plainText = content.replace(/<[^>]+>/g, '').slice(0, 3000);
 

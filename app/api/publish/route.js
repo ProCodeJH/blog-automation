@@ -42,8 +42,8 @@ export async function POST(request) {
                 break;
 
             case 'naver': {
-                // 세션에서 blogId 로드
-                let blogId = credentials?.naverBlogId;
+                // 세션에서 blogId 로드 (env 폴백)
+                let blogId = credentials?.naverBlogId || process.env.NAVER_BLOG_ID;
                 if (!blogId) {
                     try {
                         const sessionPath = path.resolve(process.cwd(), '.naver-session.json');
@@ -61,46 +61,50 @@ export async function POST(request) {
                     }, { status: 400 });
                 }
 
-                // Puppeteer 기반 자동 발행
+                // 디버그 로깅
+                const debugLog = path.resolve(process.cwd(), 'naver_route_debug.txt');
+                const dlog = (msg) => {
+                    const line = `[${new Date().toISOString()}] ${typeof msg === 'string' ? msg : JSON.stringify(msg).substring(0, 500)}`;
+                    fs.appendFileSync(debugLog, line + '\n', 'utf8');
+                };
+                fs.writeFileSync(debugLog, '', 'utf8');
+
+                // publishToNaver: 1차 Chrome프로필 → 2차 쿠키+Puppeteer → 3차 HTTP API → 폴백
+                const naverCookies = credentials?.naverCookies || process.env.NAVER_COOKIES || '';
+                dlog(`blogId: ${blogId}`);
+                dlog(`cookies length: ${naverCookies.length}`);
+                dlog(`cookies start: ${naverCookies.substring(0, 30)}`);
+                dlog(`post.title: ${post.title?.substring(0, 50)}`);
+                dlog(`post.content length: ${post.content?.length}`);
+
                 try {
-                    const { publishToNaverPuppeteer } = await import('../../../lib/platforms/naver-puppeteer.js');
-                    // post.imagePaths: 로컬 파일 경로 배열 (업로드된 이미지)
-                    const imagePaths = (post.imagePaths || []).map(p =>
-                        p.startsWith('/') ? path.join(process.cwd(), 'public', p) : p
-                    ).filter(p => fs.existsSync(p));
-
-                    result = await publishToNaverPuppeteer({
+                    result = await publishToNaver(
+                        { ...post, localImages: (post.imagePaths || []) },
+                        naverCookies,
                         blogId,
-                        title: post.title,
-                        content: post.content?.replace(/<[^>]+>/g, '') || '',
-                        tags: post.tags || [],
-                        images: imagePaths,
-                        headless: true,
-                        useProfile: true,
-                    });
-
-                    if (result.success) {
-                        result.platform = 'naver';
-                        result.method = 'puppeteer';
-                        break;
-                    }
-                } catch (puppeteerError) {
-                    console.error('[Naver Puppeteer]', puppeteerError.message);
+                    );
+                    dlog(`publishToNaver result: ${JSON.stringify(result).substring(0, 500)}`);
+                } catch (naverErr) {
+                    dlog(`publishToNaver EXCEPTION: ${naverErr.message}`);
+                    dlog(naverErr.stack);
+                    result = { success: false, error: naverErr.message };
                 }
 
-                // Puppeteer 실패 시 HTML 복사 모드 폴백
-                const naverHTML = generateNaverHTML(post);
-                const smartEditorHTML = generateNaverSmartEditorHTML(post);
-                result = {
-                    success: true,
-                    platform: 'naver',
-                    method: 'clipboard',
-                    message: '⚠️ 자동 발행 실패. HTML을 클립보드에 복사하여 붙여넣기하세요.',
-                    html: naverHTML.html,
-                    smartEditorHTML: smartEditorHTML,
-                    plainText: naverHTML.plainText,
-                    tags: naverHTML.tags,
-                };
+                // 자동 발행 실패 시 clipboard 폴백
+                if (!result.success) {
+                    dlog(`FALLBACK to clipboard: ${result.error}`);
+                    console.log('[Naver] 자동 발행 실패, clipboard 폴백:', result.error);
+                    const naverHTML = generateNaverHTML(post);
+                    result = {
+                        success: true,
+                        platform: 'naver',
+                        method: 'clipboard',
+                        message: `⚠️ 자동 발행 실패 (${result.error || '알 수 없음'}). HTML을 클립보드에 복사하여 붙여넣기하세요.`,
+                        html: naverHTML.html,
+                        plainText: naverHTML.plainText,
+                        tags: naverHTML.tags,
+                    };
+                }
                 break;
             }
 

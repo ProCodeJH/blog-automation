@@ -212,18 +212,24 @@ export default function EditorPage() {
     const handleBatchPublish = async () => {
         const platforms = Object.entries(publishPlatforms).filter(([, v]) => v).map(([k]) => k);
         if (platforms.length === 0) { showToast('플랫폼을 선택하세요'); return; }
-        if (!aiResult) { showToast('AI 편집 결과가 없습니다'); return; }
+
+        // AI 결과 or 에디터 내용 사용
+        const publishTitle = aiResult?.title || title || '제목 없음';
+        const publishContent = aiResult?.content || rawText || '';
+        const publishTags = aiResult?.tags || manualTags || [];
+        if (!publishContent.trim()) { showToast('발행할 내용이 없습니다'); return; }
 
         setIsPublishing(true);
         const settings = JSON.parse(localStorage.getItem('blogflow_settings') || '{}');
         const results = {};
 
         // 업로드된 이미지 경로 수집 (네이버 Puppeteer용)
-        const imagePaths = (aiResult.uploadedImages || []).map(img => img.originalUrl || img.url).filter(Boolean);
+        const imagePaths = (aiResult?.uploadedImages || []).map(img => img.originalUrl || img.url).filter(Boolean);
 
         for (const platform of platforms) {
             try {
                 setPublishStatus(prev => ({ ...prev, [platform]: 'publishing' }));
+                console.log(`[발행] ${platform} 시작...`);
 
                 let credentials = {};
                 if (platform === 'wordpress') {
@@ -241,22 +247,27 @@ export default function EditorPage() {
                         platform,
                         credentials,
                         post: {
-                            title: aiResult.title,
-                            content: aiResult.content,
-                            tags: aiResult.tags || manualTags,
+                            title: publishTitle,
+                            content: publishContent,
+                            tags: publishTags,
                             imagePaths,
                         },
                     }),
                 });
                 const data = await res.json();
+                console.log(`[발행] ${platform} 결과:`, data);
                 results[platform] = data.success ? 'success' : 'error';
                 setPublishStatus(prev => ({ ...prev, [platform]: data.success ? 'success' : 'error' }));
                 if (data.success && data.postUrl) {
                     showToast(`${platform}: ${data.postUrl}`);
+                } else if (!data.success) {
+                    showToast(`${platform} 실패: ${data.error || '알 수 없는 오류'}`, 'error');
                 }
             } catch (e) {
+                console.error(`[발행] ${platform} 에러:`, e);
                 results[platform] = 'error';
                 setPublishStatus(prev => ({ ...prev, [platform]: 'error' }));
+                showToast(`${platform} 에러: ${e.message}`, 'error');
             }
         }
 

@@ -1,0 +1,20 @@
+=== Test 2: with long content ===
+Time: 2026-02-11T14:02:17.709Z
+
+=== RESULT ===
+{
+  "success": true,
+  "platform": "naver",
+  "method": "puppeteer-profile",
+  "message": "✅ 네이버 블로그에 자동 발행되었습니다!",
+  "postUrl": "https://blog.naver.com/louispetergu/224180648862",
+  "blogId": "louispetergu",
+  "response": {
+    "success": true,
+    "postUrl": "https://blog.naver.com/louispetergu/224180648862",
+    "logNo": "224180648862"
+  }
+}
+
+>>> SUCCESS!
+=== Done ===
