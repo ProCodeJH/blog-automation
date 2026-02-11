@@ -1,5 +1,5 @@
 import { publishToWordPress } from '../../../lib/platforms/wordpress';
-import { publishToTistory } from '../../../lib/platforms/tistory';
+// tistory: 동적 import (case 블록 내에서 처리)
 import { generateNaverHTML, generateNaverSmartEditorHTML, publishToNaver } from '../../../lib/platforms/naver';
 import { NextResponse } from 'next/server';
 import fs from 'fs';
@@ -29,17 +29,54 @@ export async function POST(request) {
                 });
                 break;
 
-            case 'tistory':
-                if (!credentials?.accessToken || !credentials?.blogName) {
-                    return NextResponse.json({ success: false, error: '티스토리 Access Token과 블로그명을 설정에서 입력해주세요.' }, { status: 400 });
+            case 'tistory': {
+                let tsBlogId = credentials?.tsBlogName || process.env.TISTORY_BLOG_ID;
+                if (!tsBlogId) {
+                    try {
+                        const sessionPath = path.resolve(process.cwd(), '.tistory-session.json');
+                        if (fs.existsSync(sessionPath)) {
+                            const session = JSON.parse(fs.readFileSync(sessionPath, 'utf-8'));
+                            tsBlogId = session.blogId;
+                        }
+                    } catch { /* ignore */ }
                 }
-                result = await publishToTistory({
-                    accessToken: credentials.accessToken,
-                    blogName: credentials.blogName,
-                    post,
-                    visibility: credentials.visibility || '3',
-                });
+
+                if (!tsBlogId) {
+                    return NextResponse.json({
+                        success: false,
+                        error: '티스토리 blogId가 없습니다. 설정에서 티스토리 블로그명을 입력해주세요.',
+                    }, { status: 400 });
+                }
+
+                const tsCookies = credentials?.tistoryCookies || process.env.TISTORY_COOKIES || '';
+
+                try {
+                    const { publishToTistory: publishTS } = await import('../../../lib/platforms/tistory.js');
+                    result = await publishTS(
+                        { ...post, localImages: (post.imagePaths || []) },
+                        tsCookies,
+                        tsBlogId,
+                    );
+                } catch (tsErr) {
+                    result = { success: false, error: tsErr.message };
+                }
+
+                // 자동 발행 실패 시 clipboard 폴백
+                if (!result.success) {
+                    const { generateTistoryHTML } = await import('../../../lib/platforms/tistory.js');
+                    const tsHTML = generateTistoryHTML(post);
+                    result = {
+                        success: true,
+                        platform: 'tistory',
+                        method: 'clipboard',
+                        message: `⚠️ 자동 발행 실패 (${result.error || '알 수 없음'}). HTML을 클립보드에 복사하여 붙여넣기하세요.`,
+                        html: tsHTML.html,
+                        plainText: tsHTML.plainText,
+                        tags: tsHTML.tags,
+                    };
+                }
                 break;
+            }
 
             case 'naver': {
                 // 세션에서 blogId 로드 (env 폴백)
