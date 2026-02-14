@@ -245,7 +245,8 @@ export default function EditorPage() {
 
         // AI 결과 or 에디터 내용 사용
         const publishTitle = aiResult?.title || title || '제목 없음';
-        const publishContent = aiResult?.content || rawText || '';
+        const rawContent = aiResult?.content || rawText || '';
+        const publishContent = aiResult?.content ? rawContent : rawContent.split(/\n\n+/).map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('\n');
         const publishTags = aiResult?.tags || manualTags || [];
         if (!publishContent.trim()) { showToast('발행할 내용이 없습니다'); return; }
 
@@ -801,7 +802,7 @@ export default function EditorPage() {
                     <span className="soft-icon-divider" />
                     {/* Actions */}
                     <button className="soft-btn soft-btn-sm" onClick={() => handleSave('draft')} disabled={isSaving} style={{ gap: 4 }}>{isSaving ? <span className="soft-spinner" /> : I.save} 저장</button>
-                    {aiResult && <button className="soft-btn soft-btn-primary soft-btn-sm" onClick={() => setShowPublish(true)} style={{ gap: 4 }}>{I.rocket} 발행</button>}
+                    <button className="soft-btn soft-btn-primary soft-btn-sm" onClick={() => setShowPublish(true)} style={{ gap: 4 }}>{I.rocket} 발행</button>
                 </div>
             </div>
 
