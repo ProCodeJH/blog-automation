@@ -72,6 +72,7 @@ export default function Dashboard() {
     { icon: QuickIcons.posts, label: '게시물 관리', href: '/posts', desc: `${stats.total}개 저장됨` },
     { icon: QuickIcons.youtube, label: '유튜브', href: '/youtube', desc: 'AI 메타 자동 생성' },
     { icon: QuickIcons.analytics, label: '분석', href: '/analytics', desc: 'SEO & 차트' },
+    { icon: QuickIcons.posts, label: '발행 이력', href: '/history', desc: '전체 발행 기록' },
     { icon: QuickIcons.settings, label: '설정', href: '/settings', desc: '4 플랫폼 연동' },
   ];
 

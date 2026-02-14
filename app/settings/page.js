@@ -27,6 +27,10 @@ export default function SettingsPage() {
     const [naverTestResult, setNaverTestResult] = useState(null);
     const [naverTesting, setNaverTesting] = useState(false);
 
+    // WordPress 연결 테스트
+    const [wpTestResult, setWpTestResult] = useState(null);
+    const [wpTesting, setWpTesting] = useState(false);
+
     const [masterPromptOverride, setMasterPromptOverride] = useState('');
     const [showPromptEditor, setShowPromptEditor] = useState(false);
     const [saveMsg, setSaveMsg] = useState('');
@@ -73,11 +77,33 @@ export default function SettingsPage() {
         document.documentElement.setAttribute('data-theme', t);
     };
 
+    const handleWpTest = async () => {
+        if (!wpUrl || !wpUser || !wpPass) {
+            setWpTestResult({ success: false, error: 'URL, 사용자명, Application Password를 모두 입력해주세요.' });
+            return;
+        }
+        setWpTesting(true);
+        setWpTestResult(null);
+        try {
+            const res = await fetch('/api/wp-test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ siteUrl: wpUrl, username: wpUser, appPassword: wpPass }),
+            });
+            const data = await res.json();
+            setWpTestResult(data);
+        } catch (e) {
+            setWpTestResult({ success: false, error: e.message });
+        }
+        setWpTesting(false);
+    };
+
     const platforms = [
-        { key: 'wordpress', icon: 'W', label: 'WordPress', desc: 'REST API', color: '#21759b', status: wpUrl ? 'connected' : 'disconnected' },
-        { key: 'tistory', icon: 'T', label: '티스토리', desc: 'Open API', color: '#f36f21', status: tsToken ? 'connected' : 'disconnected' },
+        { key: 'wordpress', icon: 'W', label: 'WordPress', desc: 'REST API', color: '#21759b', status: wpTestResult?.success ? 'connected' : wpUrl ? 'connected' : 'disconnected' },
+        { key: 'tistory', icon: 'T', label: '티스토리', desc: 'Puppeteer 자동 발행', color: '#f36f21', status: tsBlogName ? 'connected' : 'disconnected' },
+        { key: 'velog', icon: 'V', label: '벨로그', desc: 'GraphQL API', color: '#20c997', status: 'disconnected' },
         { key: 'youtube', icon: '▶', label: 'YouTube', desc: 'Data API v3', color: '#ff0000', status: ytAccessToken ? 'connected' : 'disconnected' },
-        { key: 'naver', icon: 'N', label: '네이버 블로그', desc: naverCookies ? '쿠키 인증 (자동 발행)' : 'HTML 복사 모드', color: '#03c75a', status: naverCookies ? 'connected' : 'clipboard' },
+        { key: 'naver', icon: 'N', label: '네이버 블로그', desc: 'Puppeteer 자동 발행', color: '#03c75a', status: naverCookies ? 'connected' : 'clipboard' },
     ];
 
     return (
@@ -133,11 +159,44 @@ export default function SettingsPage() {
 
                     {/* WordPress */}
                     <div className="card settings-section">
-                        <h3>W WordPress</h3>
+                        <h3 style={{ color: '#21759b' }}>W WordPress</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            <input type="url" className="form-input" placeholder="https://yourblog.com" value={wpUrl} onChange={(e) => setWpUrl(e.target.value)} />
-                            <input type="text" className="form-input" placeholder="사용자명" value={wpUser} onChange={(e) => setWpUser(e.target.value)} />
-                            <input type="password" className="form-input" placeholder="Application Password" value={wpPass} onChange={(e) => setWpPass(e.target.value)} />
+                            <div className="form-group">
+                                <label className="form-label">사이트 URL</label>
+                                <input type="url" className="form-input" placeholder="https://yourblog.com" value={wpUrl} onChange={(e) => setWpUrl(e.target.value)} />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">사용자명</label>
+                                <input type="text" className="form-input" placeholder="admin" value={wpUser} onChange={(e) => setWpUser(e.target.value)} />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Application Password</label>
+                                <input type="password" className="form-input" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx" value={wpPass} onChange={(e) => setWpPass(e.target.value)} />
+                            </div>
+                            <button
+                                className="btn-primary"
+                                onClick={handleWpTest}
+                                disabled={wpTesting}
+                                style={{ padding: '8px 16px', fontSize: 13, background: '#21759b', border: 'none', color: '#fff', borderRadius: 6, cursor: 'pointer' }}
+                            >
+                                {wpTesting ? '⏳ 테스트 중...' : '🔌 연결 테스트'}
+                            </button>
+                            {wpTestResult && (
+                                <div style={{
+                                    padding: '10px 14px', borderRadius: 8, fontSize: 12, lineHeight: 1.6,
+                                    background: wpTestResult.success ? 'rgba(0,200,100,0.1)' : 'rgba(255,80,80,0.1)',
+                                    border: `1px solid ${wpTestResult.success ? 'rgba(0,200,100,0.3)' : 'rgba(255,80,80,0.3)'}`,
+                                    color: wpTestResult.success ? 'var(--success)' : 'var(--danger)',
+                                    whiteSpace: 'pre-line',
+                                }}>
+                                    {wpTestResult.success
+                                        ? `✅ 연결 성공!\n사이트: ${wpTestResult.siteName}\n사용자: ${wpTestResult.userName} (${wpTestResult.userRole})\n발행 권한: ${wpTestResult.canPublish ? '✓ 있음' : '✗ 없음'}`
+                                        : `❌ ${wpTestResult.error}`}
+                                </div>
+                            )}
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                                📌 Application Password 발급: WordPress 관리자 → 사용자 → 프로필 → 하단 &quot;Application Passwords&quot;
+                            </span>
                         </div>
                     </div>
 
@@ -149,12 +208,21 @@ export default function SettingsPage() {
                                 <label className="form-label">블로그명</label>
                                 <input type="text" className="form-input" placeholder="myblog (myblog.tistory.com)" value={tsBlogName} onChange={(e) => setTsBlogName(e.target.value)} />
                             </div>
-                            <div className="form-group">
-                                <label className="form-label">Access Token</label>
-                                <input type="password" className="form-input" placeholder="티스토리 Open API 토큰" value={tsToken} onChange={(e) => setTsToken(e.target.value)} />
-                            </div>
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                                <a href="https://www.tistory.com/guide/api/manage/register" target="_blank" style={{ color: '#f36f21' }}>티스토리 API 관리</a>에서 앱 등록 후 토큰 발급
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                                🤖 Puppeteer 자동 발행 (카카오 로그인 기반)<br />
+                                <code>node tistory-login.mjs</code> 로 최초 로그인 후 쿠키 자동 유지
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Velog */}
+                    <div className="card settings-section">
+                        <h3 style={{ color: '#20c997' }}>V 벨로그</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                                🚀 GraphQL API 자동 발행 (쓰기 전용 마크다운 에디터)<br />
+                                <code>node velog-login.mjs</code> 로 최초 로그인 후 쿠키 자동 유지<br />
+                                GitHub / Google / 이메일 로그인 지원
                             </span>
                         </div>
                     </div>

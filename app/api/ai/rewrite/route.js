@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 export async function POST(request) {
     try {
         const body = await request.json();
-        const { rawText, imageInfos = [], tone = 'friendly', category = '', templateId = '', customPromptAddition = '' } = body;
+        const { rawText, imageInfos = [], imageData = [], tone = 'friendly', category = '', templateId = '', customPromptAddition = '' } = body;
 
         if (!rawText || rawText.trim().length === 0) {
             return NextResponse.json({ success: false, error: '글 내용을 입력해주세요.' }, { status: 400 });
@@ -23,6 +23,7 @@ export async function POST(request) {
         const result = await rewriteContent({
             rawText: promptAddition ? `${promptAddition}\n${rawText}` : rawText,
             imageInfos,
+            imageData,
             tone,
             category,
         });
